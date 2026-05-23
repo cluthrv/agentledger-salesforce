@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomLabels xmlns="http://soap.sforce.com/2006/04/metadata">
+    <labels>
+        <fullName>NoSessionsFound</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>No Sessions Found</shortDescription>
+        <value>No AI agent sessions recorded for this record.</value>
+    </labels>
+    <labels>
+        <fullName>VerificationPassed</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Verification Passed</shortDescription>
+        <value>Audit trail verified. Hash chain is intact.</value>
+    </labels>
+    <labels>
+        <fullName>VerificationFailed</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Verification Failed</shortDescription>
+        <value>Verification failed. Audit trail may have been altered.</value>
+    </labels>
+    <labels>
+        <fullName>VerificationError</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Verification Error</shortDescription>
+        <value>Verification could not complete. Check session records and permissions.</value>
+    </labels>
+    <labels>
+        <fullName>SessionSealed</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Session Sealed</shortDescription>
+        <value>Session sealed successfully.</value>
+    </labels>
+    <labels>
+        <fullName>LoadingSessions</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Loading Sessions</shortDescription>
+        <value>Loading audit sessions...</value>
+    </labels>
+    <labels>
+        <fullName>ViewFullSession</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>View Full Session</shortDescription>
+        <value>View Full Session</value>
+    </labels>
+    <labels>
+        <fullName>VerifySession</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Verify Session</shortDescription>
+        <value>Verify Audit Trail</value>
+    </labels>
+    <labels>
+        <fullName>TamperedWarning</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Tampered Warning</shortDescription>
+        <value>This session&apos;s audit trail shows signs of tampering.</value>
+    </labels>
+    <labels>
+        <fullName>StatusActive</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Status Active</shortDescription>
+        <value>Active</value>
+    </labels>
+    <labels>
+        <fullName>StatusSealed</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Status Sealed</shortDescription>
+        <value>Sealed</value>
+    </labels>
+    <labels>
+        <fullName>StatusFailed</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Status Failed</shortDescription>
+        <value>Failed</value>
+    </labels>
+</CustomLabels>

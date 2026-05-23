@@ -1,0 +1,55 @@
+<template>
+    <lightning-card title="AgentLedger Audit Trail">
+        <template if:true={sessions}>
+            <div class="slds-p-around_medium">
+                <template for:each={sessions} for:item="session">
+                    <div key={session.Id} class="slds-box slds-m-bottom_small">
+                        <p>
+                            <strong>{session.Agent_Name__c}</strong>
+                        </p>
+
+                        <p>
+                            Status:
+                            <lightning-badge label={session.Status__c}></lightning-badge>
+                        </p>
+
+                        <p>
+                            Verification:
+                            <lightning-badge label={session.Verification_Status__c}></lightning-badge>
+                        </p>
+
+                        <p>
+                            Records: {session.Record_Count__c}
+                        </p>
+
+                        <p>
+                            Started:
+                            <lightning-formatted-date-time
+                                value={session.Start_Time__c}>
+                            </lightning-formatted-date-time>
+                        </p>
+
+                        <lightning-button
+                            variant="brand"
+                            label="View Session"
+                            data-id={session.Id}
+                            onclick={handleView}>
+                        </lightning-button>
+                    </div>
+                </template>
+            </div>
+        </template>
+
+        <template if:true={error}>
+            <div class="slds-p-around_medium slds-text-color_error">
+                {error}
+            </div>
+        </template>
+
+        <template if:true={isEmpty}>
+            <div class="slds-p-around_medium">
+                No AI agent sessions recorded for this record.
+            </div>
+        </template>
+    </lightning-card>
+</template>

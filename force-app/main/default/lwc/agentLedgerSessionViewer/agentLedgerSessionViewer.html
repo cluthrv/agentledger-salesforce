@@ -1,0 +1,83 @@
+<template>
+    <lightning-card title="AgentLedger Session Viewer">
+        <template if:true={session}>
+            <div class="slds-p-around_medium">
+                <div class="slds-grid slds-wrap slds-m-bottom_medium">
+                    <div class="slds-col slds-size_1-of-2">
+                        <p><strong>Agent:</strong> {session.Agent_Name__c}</p>
+                        <p><strong>Type:</strong> {session.Agent_Type__c}</p>
+                        <p><strong>Use Case:</strong> {session.Use_Case__c}</p>
+                        <p><strong>Platform:</strong> {session.Platform__c}</p>
+                    </div>
+                    <div class="slds-col slds-size_1-of-2">
+                        <p><strong>Status:</strong> <lightning-badge label={session.Status__c}></lightning-badge></p>
+                        <p><strong>Verification:</strong> <lightning-badge label={session.Verification_Status__c}></lightning-badge></p>
+                        <p><strong>Record Count:</strong> {session.Record_Count__c}</p>
+                        <p><strong>External Correlation:</strong> {session.External_Correlation_Id__c}</p>
+                    </div>
+                </div>
+
+                <div class="slds-m-bottom_medium">
+                    <p><strong>Merkle Root</strong></p>
+                    <p class="hash-text">{session.Merkle_Root__c}</p>
+                </div>
+
+                <lightning-button
+                    variant="brand"
+                    label="Verify Audit Trail"
+                    onclick={handleVerify}
+                    disabled={isVerifying}>
+                </lightning-button>
+
+                <template if:true={verifyMessage}>
+                    <div class="slds-m-top_small">{verifyMessage}</div>
+                </template>
+
+                <hr />
+
+                <h3 class="slds-text-heading_small slds-m-bottom_small">Audit Timeline</h3>
+
+                <template for:each={records} for:item="record">
+                    <div key={record.Id} class="timeline-card slds-box slds-m-bottom_small">
+                        <p>
+                            <strong>#{record.Sequence_Number__c}</strong>
+                            <lightning-badge label={record.Action_Type__c}></lightning-badge>
+                            <lightning-badge label={record.Risk_Level__c}></lightning-badge>
+                        </p>
+
+                        <p class="slds-text-heading_small">{record.Action_Label__c}</p>
+                        <p><strong>Decision Category:</strong> {record.Decision_Category__c}</p>
+
+                        <lightning-accordion allow-multiple-sections-open>
+                            <lightning-accordion-section name="context" label="Input Context">
+                                <lightning-formatted-text value={record.Input_Context__c}></lightning-formatted-text>
+                            </lightning-accordion-section>
+
+                            <lightning-accordion-section name="output" label="Output Result">
+                                <lightning-formatted-text value={record.Output_Result__c}></lightning-formatted-text>
+                            </lightning-accordion-section>
+
+                            <lightning-accordion-section name="reasoning" label="Reasoning">
+                                <lightning-formatted-text value={record.Reasoning__c}></lightning-formatted-text>
+                            </lightning-accordion-section>
+
+                            <lightning-accordion-section name="hashes" label="Cryptographic Hashes">
+                                <p><strong>Previous Hash</strong></p>
+                                <p class="hash-text">{record.Previous_Hash__c}</p>
+
+                                <p><strong>Record Hash</strong></p>
+                                <p class="hash-text">{record.Record_Hash__c}</p>
+                            </lightning-accordion-section>
+                        </lightning-accordion>
+                    </div>
+                </template>
+            </div>
+        </template>
+
+        <template if:true={error}>
+            <div class="slds-p-around_medium slds-text-color_error">
+                {error}
+            </div>
+        </template>
+    </lightning-card>
+</template>

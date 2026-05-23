@@ -1,0 +1,51 @@
+<template>
+    <lightning-card title="AgentLedger Admin Dashboard">
+        <div class="slds-p-around_medium">
+            <div class="slds-grid slds-wrap slds-gutters slds-m-bottom_medium">
+                <div class="slds-col slds-size_1-of-4">
+                    <div class="metric-card">Total<br />{totalSessions}</div>
+                </div>
+                <div class="slds-col slds-size_1-of-4">
+                    <div class="metric-card">Sealed<br />{sealedSessions}</div>
+                </div>
+                <div class="slds-col slds-size_1-of-4">
+                    <div class="metric-card">Tampered<br />{tamperedSessions}</div>
+                </div>
+                <div class="slds-col slds-size_1-of-4">
+                    <div class="metric-card">Active<br />{activeSessions}</div>
+                </div>
+            </div>
+
+            <lightning-input
+                label="Agent Name"
+                value={agentName}
+                onchange={handleAgentNameChange}>
+            </lightning-input>
+
+            <lightning-input
+                label="Object API Name"
+                value={objectApiName}
+                onchange={handleObjectApiNameChange}>
+            </lightning-input>
+
+            <div class="slds-m-top_medium">
+                <lightning-button label="Apply Filters" variant="brand" onclick={loadSessions}></lightning-button>
+                <lightning-button label="Reset" class="slds-m-left_small" onclick={resetFilters}></lightning-button>
+            </div>
+
+            <div class="slds-m-top_medium">
+                <lightning-datatable
+                    key-field="Id"
+                    data={sessions}
+                    columns={columns}
+                    hide-checkbox-column
+                    onrowaction={handleRowAction}>
+                </lightning-datatable>
+            </div>
+
+            <template if:true={error}>
+                <div class="slds-text-color_error slds-m-top_medium">{error}</div>
+            </template>
+        </div>
+    </lightning-card>
+</template>
