@@ -257,4 +257,12 @@ private class AgentLedgerRecordedActionsTest {
         System.assertNotEquals(null, jobId);
         System.assertEquals('0 0 * * * ?', [SELECT CronExpression FROM CronTrigger WHERE Id = :jobId].CronExpression);
     }
+
+    @isTest
+    static void theSchedulerStartsAutoCloseByName() {
+        Test.startTest();
+        new AgentLedgerScheduler().execute(null);
+        Test.stopTest();
+        System.assertEquals(1, [SELECT COUNT() FROM AsyncApexJob WHERE ApexClass.Name = 'AgentLedgerAutoClose' AND JobType = 'BatchApex']);
+    }
 }

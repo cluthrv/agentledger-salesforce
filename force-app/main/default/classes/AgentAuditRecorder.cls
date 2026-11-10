@@ -45,6 +45,8 @@ public with sharing class AgentAuditRecorder {
         public String fieldChanges;
         public String captureMethod;
         public Integer turnNumber;
+        /** Overrides the run's policy reference for this step, e.g. the rule a decision applied. */
+        public String policyReference;
     }
 
     /**
@@ -56,7 +58,17 @@ public with sharing class AgentAuditRecorder {
      * @return The Salesforce record Id of the new run
      */
     public static Id startSession(String agentId, String relatedRecordId, String platform) {
+        return startSession(agentId, relatedRecordId, platform, null);
+    }
+
+    /**
+     * Start a new run, recording the agent's version, instructions and policy.
+     *
+     * @param policyReference Optional policy reference passed by the agent
+     */
+    public static Id startSession(String agentId, String relatedRecordId, String platform, String policyReference) {
         String relatedId = normalizeId(relatedRecordId);
+        AgentLedgerPolicy.Captured policy = AgentLedgerPolicy.capture(agentId, policyReference);
         Agent_Audit_Session__c session = new Agent_Audit_Session__c(
             Session_Id__c = generateUUID(),
             Agent_Id__c = agentId,
@@ -70,9 +82,18 @@ public with sharing class AgentAuditRecorder {
             Platform__c = platform,
             Record_Count__c = 0,
             Hash_Version__c = HashChainService.HASH_V2,
-            Mode__c = AgentLedgerSettings.forAgent(agentId).mode
+            Mode__c = AgentLedgerSettings.forAgent(agentId).mode,
+            Agent_Version__c = policy.agentVersion,
+            Instructions_Hash__c = policy.instructionsHash,
+            Policy_Reference__c = AgentLedgerRecordSupport.fit(policy.policyReference, 255),
+            Policy_Hash__c = policy.policyHash
         );
-        insert session;
+        AgentLedgerGuard.beginLedgerWrite();
+        try {
+            insert session;
+        } finally {
+            AgentLedgerGuard.endLedgerWrite();
+        }
         return session.Id;
     }
 
@@ -105,7 +126,8 @@ public with sharing class AgentAuditRecorder {
      */
     public static Agent_Audit_Record__c recordEntry(Id sessionId, EntryInput entry) {
         Agent_Audit_Session__c session = [
-            SELECT Id, Status__c, Record_Count__c, Session_Id__c, Hash_Version__c
+            SELECT Id, Status__c, Record_Count__c, Session_Id__c, Hash_Version__c,
+                   Agent_Version__c, Instructions_Hash__c, Policy_Reference__c, Policy_Hash__c
             FROM Agent_Audit_Session__c
             WHERE Id = :sessionId
             LIMIT 1
@@ -153,7 +175,13 @@ public with sharing class AgentAuditRecorder {
             Field_Changes__c = entry.fieldChanges,
             Capture_Method__c = entry.captureMethod,
             Turn_Number__c = entry.turnNumber,
-            Previous_Hash__c = previousHash
+            Previous_Hash__c = previousHash,
+            // What the agent acted under, from the run; the entry hash covers it.
+            Agent_Version__c = session.Agent_Version__c,
+            Instructions_Hash__c = session.Instructions_Hash__c,
+            Policy_Reference__c = String.isNotBlank(entry.policyReference)
+                ? AgentLedgerRecordSupport.fit(entry.policyReference, 255) : session.Policy_Reference__c,
+            Policy_Hash__c = session.Policy_Hash__c
         );
 
         record.Record_Hash__c = HashChainService.versionOf(session.Hash_Version__c) == HashChainService.HASH_V2
@@ -192,80 +220,105 @@ public with sharing class AgentAuditRecorder {
      */
     @AuraEnabled
     public static VerifySessionResult verifySession(Id sessionId) {
-        VerifySessionResult result = new VerifySessionResult();
-        result.checks = new List<VerificationCheck>();
+        if (!AgentLedgerAccess.canViewRun(sessionId)) {
+            throw new MerkleTreeService.AgentLedgerException('You do not have access to this run.');
+        }
+        return new Verifier().verify(sessionId);
+    }
 
-        Agent_Audit_Session__c session = [
-            SELECT Id, Status__c, Merkle_Root__c, Record_Count__c, Session_Id__c, Hash_Version__c
-            FROM Agent_Audit_Session__c
-            WHERE Id = :sessionId
-            LIMIT 1
-        ];
+    /**
+     * Runs the checks without sharing, once verifySession has confirmed the
+     * user may see the run: runs are private, but anyone who can read a run's
+     * related record may verify it.
+     */
+    private without sharing class Verifier {
+        VerifySessionResult verify(Id sessionId) {
+            VerifySessionResult result = new VerifySessionResult();
+            result.checks = new List<VerificationCheck>();
 
-        List<Agent_Audit_Record__c> records = queryEntries(sessionId);
+            Agent_Audit_Session__c session = [
+                SELECT Id, Status__c, Merkle_Root__c, Record_Count__c, Session_Id__c, Hash_Version__c
+                FROM Agent_Audit_Session__c
+                WHERE Id = :sessionId
+                LIMIT 1
+            ];
 
-        // Check 1: entry hashes and chain linkage
-        HashChainService.VerificationResult chainResult =
-            HashChainService.verifyChain(records, session.Hash_Version__c, session.Session_Id__c);
-        VerificationCheck chainCheck = new VerificationCheck();
-        chainCheck.name = 'hash_chain_integrity';
-        chainCheck.passed = chainResult.valid;
-        chainCheck.detail = chainResult.valid
-            ? 'All ' + records.size() + ' records have valid hashes and chain linkage'
-            : String.join(chainResult.errors, '; ');
-        result.checks.add(chainCheck);
+            List<Agent_Audit_Record__c> records = [
+                SELECT Id, Name, Audit_Session__c, Sequence_Number__c, Entry_Id__c,
+                       Action_Timestamp__c, Timestamp_Text__c, Agent_Id__c, Action_Type__c,
+                       Input_Context__c, Output_Result__c, Reasoning__c, Summary__c,
+                       Target_Record_Id__c, Target_Object__c, Field_Changes__c,
+                       Capture_Method__c, Turn_Number__c, Agent_Version__c, Instructions_Hash__c,
+                       Policy_Reference__c, Policy_Hash__c,
+                       Record_Hash__c, Previous_Hash__c, CreatedBy.TimeZoneSidKey
+                FROM Agent_Audit_Record__c
+                WHERE Audit_Session__c = :sessionId
+                ORDER BY Sequence_Number__c ASC
+            ];
 
-        // Check 2: Merkle root, once sealed
-        if (isClosed(session.Status__c)) {
-            List<String> hashes = new List<String>();
-            for (Agent_Audit_Record__c rec : records) {
-                hashes.add(rec.Record_Hash__c);
+            // Check 1: entry hashes and chain linkage
+            HashChainService.VerificationResult chainResult =
+                HashChainService.verifyChain(records, session.Hash_Version__c, session.Session_Id__c);
+            VerificationCheck chainCheck = new VerificationCheck();
+            chainCheck.name = 'hash_chain_integrity';
+            chainCheck.passed = chainResult.valid;
+            chainCheck.detail = chainResult.valid
+                ? 'All ' + records.size() + ' records have valid hashes and chain linkage'
+                : String.join(chainResult.errors, '; ');
+            result.checks.add(chainCheck);
+
+            // Check 2: Merkle root, once sealed
+            if (isClosed(session.Status__c)) {
+                List<String> hashes = new List<String>();
+                for (Agent_Audit_Record__c rec : records) {
+                    hashes.add(rec.Record_Hash__c);
+                }
+                String recomputedRoot = MerkleTreeService.computeRoot(hashes, session.Hash_Version__c);
+                Boolean rootValid = session.Merkle_Root__c != null && recomputedRoot == session.Merkle_Root__c;
+
+                VerificationCheck rootCheck = new VerificationCheck();
+                rootCheck.name = 'merkle_root_integrity';
+                rootCheck.passed = rootValid;
+                rootCheck.detail = rootValid
+                    ? 'Merkle root verified: ' + session.Merkle_Root__c.substring(0, 16) + '...'
+                    : 'Merkle root mismatch: stored ' + shortHash(session.Merkle_Root__c) +
+                      ' vs computed ' + shortHash(recomputedRoot);
+                result.checks.add(rootCheck);
             }
-            String recomputedRoot = MerkleTreeService.computeRoot(hashes, session.Hash_Version__c);
-            Boolean rootValid = session.Merkle_Root__c != null && recomputedRoot == session.Merkle_Root__c;
 
-            VerificationCheck rootCheck = new VerificationCheck();
-            rootCheck.name = 'merkle_root_integrity';
-            rootCheck.passed = rootValid;
-            rootCheck.detail = rootValid
-                ? 'Merkle root verified: ' + session.Merkle_Root__c.substring(0, 16) + '...'
-                : 'Merkle root mismatch: stored ' + shortHash(session.Merkle_Root__c) +
-                  ' vs computed ' + shortHash(recomputedRoot);
-            result.checks.add(rootCheck);
-        }
+            // Check 3: entry count
+            Integer expected = session.Record_Count__c == null ? 0 : session.Record_Count__c.intValue();
+            VerificationCheck countCheck = new VerificationCheck();
+            countCheck.name = 'record_count';
+            countCheck.passed = records.size() == expected;
+            countCheck.detail = 'Session contains ' + records.size() + ' record(s), expected ' + expected;
+            result.checks.add(countCheck);
 
-        // Check 3: entry count
-        Integer expected = session.Record_Count__c == null ? 0 : session.Record_Count__c.intValue();
-        VerificationCheck countCheck = new VerificationCheck();
-        countCheck.name = 'record_count';
-        countCheck.passed = records.size() == expected;
-        countCheck.detail = 'Session contains ' + records.size() + ' record(s), expected ' + expected;
-        result.checks.add(countCheck);
-
-        result.valid = true;
-        for (VerificationCheck check : result.checks) {
-            if (!check.passed) {
-                result.valid = false;
-                break;
+            result.valid = true;
+            for (VerificationCheck check : result.checks) {
+                if (!check.passed) {
+                    result.valid = false;
+                    break;
+                }
             }
-        }
 
-        result.message = result.valid
-            ? 'Session verified successfully. ' + records.size() + ' records, chain intact.'
-            : 'Session verification FAILED. See checks for details.';
+            result.message = result.valid
+                ? 'Session verified successfully. ' + records.size() + ' records, chain intact.'
+                : 'Session verification FAILED. See checks for details.';
 
-        // Record the result with its time. Status stays the lifecycle; runs
-        // still holding a status from earlier versions move to Closed.
-        Agent_Audit_Session__c resultRow = new Agent_Audit_Session__c(
-            Id = session.Id,
-            Integrity__c = result.valid ? 'Verified' : 'Tampered',
-            Last_Verified_At__c = DateTime.now()
-        );
-        if (LEGACY_CLOSED.contains(session.Status__c)) {
-            resultRow.Status__c = STATUS_CLOSED;
+            // Record the result with its time. Status stays the lifecycle; runs
+            // still holding a status from earlier versions move to Closed.
+            Agent_Audit_Session__c resultRow = new Agent_Audit_Session__c(
+                Id = session.Id,
+                Integrity__c = result.valid ? 'Verified' : 'Tampered',
+                Last_Verified_At__c = DateTime.now()
+            );
+            if (LEGACY_CLOSED.contains(session.Status__c)) {
+                resultRow.Status__c = STATUS_CLOSED;
+            }
+            new LedgerWriter().write(resultRow);
+            return result;
         }
-        new LedgerWriter().write(resultRow);
-        return result;
     }
 
     /**
@@ -336,7 +389,8 @@ public with sharing class AgentAuditRecorder {
                    Action_Timestamp__c, Timestamp_Text__c, Agent_Id__c, Action_Type__c,
                    Input_Context__c, Output_Result__c, Reasoning__c, Summary__c,
                    Target_Record_Id__c, Target_Object__c, Field_Changes__c,
-                   Capture_Method__c, Turn_Number__c,
+                   Capture_Method__c, Turn_Number__c, Agent_Version__c, Instructions_Hash__c,
+                   Policy_Reference__c, Policy_Hash__c,
                    Record_Hash__c, Previous_Hash__c, CreatedBy.TimeZoneSidKey
             FROM Agent_Audit_Record__c
             WHERE Audit_Session__c = :sessionId

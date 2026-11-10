@@ -96,7 +96,26 @@ One per step.
 A run that touches several records appears on each of them: the timeline shows
 runs related to the record plus runs with entries targeting it.
 
-### 4.3 Verification Log (`Agent_Run_Verification__c`, new)
+### 4.3 What the agent acted under (added after the CACM review)
+
+Reviewers asked how an investigator, months later, can tell which policy was in
+force when the agent acted. Runs and entries therefore carry, captured by code
+when the run starts:
+
+| Field | Source |
+| --- | --- |
+| `Agent_Version__c` | The Agentforce agent and its active version (`GenAiPlannerDefinition`, `BotVersion`) |
+| `Instructions_Hash__c` | SHA-256 (tag `agentledger/agent-instructions/v1`) of every subagent's label, description, scope and instructions, found through `GenAiPlannerFunctionDef` |
+| `Policy_Reference__c` | The agent's AgentLedger Setting, or passed by the agent (Start, Record Agent Action) |
+| `Policy_Hash__c` | SHA-256 (tag `agentledger/policy/v1`) of the policy text in the agent's setting |
+
+Entry hashes cover these fields, so a step cannot later be made to cite a
+different policy. The instruction text is kept once per distinct hash in
+`Agent_Instructions_Snapshot__c` (created only by AgentLedger, never changed),
+so the investigator can read exactly what was in force. Capture never blocks a
+run: if the agent definition cannot be read, the fields stay blank.
+
+### 4.4 Verification Log (`Agent_Run_Verification__c`, new)
 
 Child of a run, tamper modes only: who verified, when, result, failing checks.
 This answers "was it ever found tampered", which the current-state check alone
@@ -141,7 +160,16 @@ A trigger handler on watched objects. Triggers are compiled per object, so the
 package ships handlers for common standard objects (Account, Contact, Lead,
 Opportunity, Case) and the docs give a one-line trigger for any other object.
 
-### 5.4 Closing runs
+### 5.4 Reconciliation with independent histories (added after the CACM review)
+
+Cryptographic checks cannot find steps that were never recorded. As a check on
+completeness that does not rely on the agent, a reconciliation report compares
+Data Change entries with Salesforce's own history (Field History Tracking or
+Shield Field Audit Trail) for watched objects, and lists changes made during a
+run that have no matching entry. Planned for Phase 2, next to the change
+detector.
+
+### 5.5 Closing runs
 
 - Agent Script: closed by `after_reasoning` logic on conversation end.
 - Otherwise: a scheduled job closes runs inactive longer than the configured
@@ -185,7 +213,18 @@ anywhere gets the same answer.
 A user with full admin rights can still disable or work around any in-org
 control. That is what export and anchoring address, and the docs say so.
 
-### 6.4 Export Evidence
+### 6.4 Selective disclosure (added after the CACM review)
+
+- **One entry with its proof:** export a single entry, its Merkle proof and the
+  run's anchor token, so an auditor can verify that one decision without seeing
+  the rest of the run.
+- **Salted commitments:** for fields whose values must not be stored, store a
+  salted hash instead of "(not stored)", so the value stays out of the log but
+  can be proven to match if it is disclosed later.
+
+Planned for Phase 3.
+
+### 6.5 Export Evidence
 
 Downloads the run as JSON in the library's `ExportedSession` shape, with the
 anchor token when present. An auditor verifies it offline:
@@ -250,6 +289,14 @@ Run and entry objects are Private; all access goes through AgentLedger's Apex,
 which enforces record access and field-level security as described above.
 
 ## 11. Packaging and install
+
+**Scheduled jobs and upgrades.** Salesforce refuses to deploy (or upgrade a
+package with) Apex while a scheduled job is pending, unless "Allow deployments
+of components when corresponding Apex jobs are pending or in progress" is on in
+Deployment Settings. The auto-close job schedules a dependency-free wrapper
+(`AgentLedgerScheduler`, which starts the batch by name), and the Setup page
+will offer to pause and resume auto-close around upgrades.
+
 
 - One unlocked package (core, UI, actions, setup page), no namespace for the
   open-source release; the `aledger` namespace is reserved for the AppExchange

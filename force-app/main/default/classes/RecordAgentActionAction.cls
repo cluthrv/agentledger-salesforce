@@ -19,6 +19,9 @@ public with sharing class RecordAgentActionAction {
         @InvocableVariable(label='Related Record Id' description='Optional. The record this step is about, used to find or start the run when no Session Id is given.' required=false)
         public String relatedRecordId;
 
+        @InvocableVariable(label='Policy Reference' description='Optional. The policy or rule this step applied, e.g. "Escalation Policy v3, rule 2".' required=false)
+        public String policyReference;
+
         @InvocableVariable(label='Agent Id' description='Identifier for the AI agent. Should match the agentId used to start the session.' required=true)
         public String agentId;
 
@@ -97,14 +100,16 @@ public with sharing class RecordAgentActionAction {
                     continue;
                 }
 
-                Agent_Audit_Record__c record = AgentAuditRecorder.recordAction(
-                    runId,
-                    req.agentId,
-                    req.actionType,
-                    req.inputContext,
-                    req.outputResult,
-                    req.reasoning
-                );
+                AgentAuditRecorder.EntryInput entry = new AgentAuditRecorder.EntryInput();
+                entry.agentId = req.agentId;
+                entry.actionType = req.actionType;
+                entry.inputContext = req.inputContext;
+                entry.outputResult = req.outputResult;
+                entry.reasoning = req.reasoning;
+                entry.captureMethod = 'Reported_by_Agent';
+                entry.policyReference = req.policyReference;
+                entry.targetRecordId = req.relatedRecordId;
+                Agent_Audit_Record__c record = AgentAuditRecorder.recordEntry(runId, entry);
 
                 res.auditRecordId  = record.Id;
                 res.recordHash     = record.Record_Hash__c;

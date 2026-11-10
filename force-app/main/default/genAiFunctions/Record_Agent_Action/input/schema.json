@@ -54,6 +54,13 @@
       "lightning:type": "lightning__recordIdType",
       "lightning:isPII": false,
       "copilotAction:isUserInput": false
+    },
+    "policyReference": {
+      "title": "Policy Reference",
+      "description": "Optional. The policy or rule this step applied, for example \"Escalation Policy v3, rule 2\".",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
     }
   },
   "lightning:type": "lightning__objectType"

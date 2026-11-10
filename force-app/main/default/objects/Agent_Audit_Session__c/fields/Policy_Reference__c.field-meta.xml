@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Policy_Reference__c</fullName>
+    <description>The policy this run acted under, e.g. "Escalation Policy v3", from the agent's AgentLedger Setting or passed by the agent.</description>
+    <externalId>false</externalId>
+    <label>Policy Reference</label>
+    <length>255</length>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

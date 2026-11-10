@@ -75,7 +75,9 @@ private class AgentLedgerV2Test {
         Agent_Audit_Session__c session = new Agent_Audit_Session__c(
             Session_Id__c = 'legacy-0001', Agent_Id__c = 'legacy-agent', Status__c = 'Active',
             Start_Time__c = DateTime.now(), Related_Record_Id__c = String.valueOf(Id.valueOf(RELATED_ID)), Record_Count__c = 0);
+        AgentLedgerGuard.allowManualEditsForTest = true; // create a run as earlier versions did
         insert session;
+        AgentLedgerGuard.allowManualEditsForTest = false;
         AgentAuditRecorder.recordAction(session.Id, 'legacy-agent', 'Query', 'in', 'out', 'v1 entry one');
         AgentAuditRecorder.recordAction(session.Id, 'legacy-agent', 'Decision', 'in', 'out', 'v1 entry two');
         AgentAuditRecorder.sealSession(session.Id);
@@ -157,6 +159,7 @@ private class AgentLedgerV2Test {
     @isTest
     static void theRecordPageFindsRunsByEitherIdForm() {
         sealedRun();
+        AgentLedgerAccess.readAccessForTest = new Map<Id, Boolean>{ Id.valueOf(RELATED_ID) => true }; // the viewer can read the record
         System.assertEquals(1, RecordAuditTrailController.getSessionsForRecord(RELATED_ID).size(), '15-character form');
         System.assertEquals(1, RecordAuditTrailController.getSessionsForRecord(String.valueOf(Id.valueOf(RELATED_ID))).size(), '18-character form');
     }

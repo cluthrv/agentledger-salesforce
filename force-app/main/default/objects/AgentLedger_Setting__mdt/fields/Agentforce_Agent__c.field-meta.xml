@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Agentforce_Agent__c</fullName>
+    <description>API name of the Agentforce agent this Agent Id belongs to, for capturing its version and instructions. Blank means the Agent Id itself.</description>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Agentforce Agent</label>
+    <length>255</length>
+    <required>false</required>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

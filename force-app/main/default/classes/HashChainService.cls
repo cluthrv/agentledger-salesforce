@@ -71,6 +71,10 @@ public with sharing class HashChainService {
         if (record.Turn_Number__c != null) {
             metadata.put('turnNumber', record.Turn_Number__c.intValue());
         }
+        putIfNotNull(metadata, 'agentVersion', record.Agent_Version__c);
+        putIfNotNull(metadata, 'instructionsHash', record.Instructions_Hash__c);
+        putIfNotNull(metadata, 'policyReference', record.Policy_Reference__c);
+        putIfNotNull(metadata, 'policyHash', record.Policy_Hash__c);
 
         Map<String, Object> content = new Map<String, Object>{
             'id' => record.Entry_Id__c,

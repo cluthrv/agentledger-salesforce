@@ -7,7 +7,7 @@
  * Designed to work within Salesforce governor limits. Tree construction
  * is performed in-memory using Lists rather than recursive structures.
  */
-public with sharing class MerkleTreeService {
+public inherited sharing class MerkleTreeService {
 
     /**
      * Compute the Merkle root from a list of Action Record hashes.

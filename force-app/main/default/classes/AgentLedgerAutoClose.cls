@@ -8,11 +8,13 @@
  * is visible rather than silent.
  *
  * Schedule it once (hourly):   AgentLedgerAutoClose.scheduleHourly();
+ * (This schedules AgentLedgerScheduler, which starts this batch by name, so a
+ * scheduled job never blocks deploying or upgrading AgentLedger.)
  * Or run it now:               Database.executeBatch(new AgentLedgerAutoClose(), 20);
  *
  * Runs without sharing, so it closes every user's runs.
  */
-public without sharing class AgentLedgerAutoClose implements Database.Batchable<SObject>, Schedulable {
+public without sharing class AgentLedgerAutoClose implements Database.Batchable<SObject> {
 
     public static final String JOB_NAME = 'AgentLedger auto-close';
     public static final Integer BATCH_SIZE = 20;
@@ -32,10 +34,6 @@ public without sharing class AgentLedgerAutoClose implements Database.Batchable<
     }
 
     public void finish(Database.BatchableContext context) {
-    }
-
-    public void execute(SchedulableContext context) {
-        Database.executeBatch(new AgentLedgerAutoClose(), BATCH_SIZE);
     }
 
     /** Close the given open runs as Incomplete. Returns how many were closed. */
@@ -65,7 +63,7 @@ public without sharing class AgentLedgerAutoClose implements Database.Batchable<
 
     /** Schedule the job to run at the top of every hour. Returns the job Id. */
     public static Id scheduleHourly() {
-        return System.schedule(JOB_NAME, '0 0 * * * ?', new AgentLedgerAutoClose());
+        return System.schedule(JOB_NAME, '0 0 * * * ?', new AgentLedgerScheduler());
     }
 
     private static DateTime cutoff() {

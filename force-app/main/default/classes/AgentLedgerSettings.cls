@@ -33,6 +33,9 @@ public with sharing class AgentLedgerSettings {
         public Set<String> watchedObjects = new Set<String>();
         public String anchorProvider = 'None';
         public String anchorNamedCredential;
+        public String agentforceAgent;
+        public String policyReference;
+        public String policyText;
 
         public Boolean isTamperEvident() {
             return mode == MODE_TAMPER_EVIDENT || mode == MODE_ANCHORED;
@@ -62,6 +65,13 @@ public with sharing class AgentLedgerSettings {
             if (String.isNotBlank(agentRecord.On_Log_Failure__c)) {
                 r.onLogFailure = agentRecord.On_Log_Failure__c;
             }
+            r.agentforceAgent = agentRecord.Agentforce_Agent__c;
+            if (String.isNotBlank(agentRecord.Policy_Reference__c)) {
+                r.policyReference = agentRecord.Policy_Reference__c;
+            }
+            if (String.isNotBlank(agentRecord.Policy_Text__c)) {
+                r.policyText = agentRecord.Policy_Text__c;
+            }
         }
         return r;
     }
@@ -89,6 +99,8 @@ public with sharing class AgentLedgerSettings {
             r.anchorProvider = org.Anchor_Provider__c;
         }
         r.anchorNamedCredential = org.Anchor_Named_Credential__c;
+        r.policyReference = org.Policy_Reference__c;
+        r.policyText = org.Policy_Text__c;
         return r;
     }
 

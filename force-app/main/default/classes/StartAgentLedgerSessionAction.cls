@@ -18,6 +18,9 @@ public with sharing class StartAgentLedgerSessionAction {
 
         @InvocableVariable(label='Platform' description='Platform identifier, e.g. salesforce, agentforce' required=false)
         public String platform;
+
+        @InvocableVariable(label='Policy Reference' description='Optional. The policy this run acts under, e.g. "Escalation Policy v3". Defaults to the agent setting.' required=false)
+        public String policyReference;
     }
 
     public class Result {
@@ -67,7 +70,8 @@ public with sharing class StartAgentLedgerSessionAction {
                 Id sessionId = AgentAuditRecorder.startSession(
                     req.agentId,
                     req.relatedRecordId,
-                    String.isNotBlank(req.platform) ? req.platform : 'salesforce'
+                    String.isNotBlank(req.platform) ? req.platform : 'salesforce',
+                    req.policyReference
                 );
 
                 res.sessionId = sessionId;

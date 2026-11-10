@@ -33,7 +33,11 @@ public with sharing class AgentLedgerGuard {
         Agent_Audit_Session__c.Start_Time__c,
         Agent_Audit_Session__c.End_Time__c,
         Agent_Audit_Session__c.Started_By__c,
-        Agent_Audit_Session__c.Last_Activity__c
+        Agent_Audit_Session__c.Last_Activity__c,
+        Agent_Audit_Session__c.Agent_Version__c,
+        Agent_Audit_Session__c.Instructions_Hash__c,
+        Agent_Audit_Session__c.Policy_Reference__c,
+        Agent_Audit_Session__c.Policy_Hash__c
     };
 
     private static Integer ledgerWriteDepth = 0;
@@ -61,6 +65,28 @@ public with sharing class AgentLedgerGuard {
 
     private static Boolean bypass() {
         return isLedgerWrite() || manualEditsAllowed();
+    }
+
+    // ── Creation: only AgentLedger code creates runs, entries and snapshots ──
+
+    public static void beforeInsert(List<SObject> rows) {
+        if (bypass()) {
+            return;
+        }
+        for (SObject row : rows) {
+            row.addError('AgentLedger records are created only by AgentLedger.');
+        }
+    }
+
+    // ── Snapshots: never changed or deleted ──
+
+    public static void beforeSnapshotChange(List<SObject> rows) {
+        if (bypass()) {
+            return;
+        }
+        for (SObject row : rows) {
+            row.addError('Agent instruction snapshots are a permanent record and cannot be changed or deleted.');
+        }
     }
 
     // ── Entries ──

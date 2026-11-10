@@ -21,6 +21,7 @@ private class RecordAuditTrailControllerTest {
             '{}', '{}', 'Test action');
 
         // Query
+        AgentLedgerAccess.readAccessForTest = new Map<Id, Boolean>{ Id.valueOf('001000000000001') => true }; // the viewer can read the record
         List<RecordAuditTrailController.SessionSummary> results =
             RecordAuditTrailController.getSessionsForRecord('001000000000001');
 

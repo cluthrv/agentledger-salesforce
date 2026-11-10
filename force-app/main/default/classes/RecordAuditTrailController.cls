@@ -4,8 +4,12 @@
  * Provides data for the recordAuditTrail LWC component that sits on
  * any Salesforce record page (Opportunity, Account, Case, etc.) and
  * displays the AgentLedger audit trail for that specific record.
+ *
+ * Runs are private, so this class reads them without sharing, and only after
+ * confirming the user can read the record: whoever may see a record may see
+ * what agents did to it.
  */
-public with sharing class RecordAuditTrailController {
+public without sharing class RecordAuditTrailController {
 
     /**
      * Get all audit sessions related to a specific Salesforce record.
@@ -16,6 +20,15 @@ public with sharing class RecordAuditTrailController {
     public static List<SessionSummary> getSessionsForRecord(String recordId) {
         List<SessionSummary> summaries = new List<SessionSummary>();
         if (String.isBlank(recordId)) {
+            return summaries;
+        }
+        Id asId;
+        try {
+            asId = Id.valueOf(recordId);
+        } catch (StringException e) {
+            return summaries;
+        }
+        if (!AgentLedgerAccess.canReadRecord(asId)) {
             return summaries;
         }
 

@@ -4,7 +4,55 @@
         <enabled>true</enabled>
         <name>AgentLedger_Allow_Entry_Edits</name>
     </customPermissions>
-    <description>For testing only: lets the user edit AgentLedger entries to see tamper detection work. Do not assign in production.</description>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Agent_Audit_Record__c.Reasoning__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Agent_Audit_Record__c.Input_Context__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Agent_Audit_Record__c.Output_Result__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Agent_Audit_Record__c.Summary__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Agent_Audit_Record__c.Field_Changes__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Agent_Audit_Record__c.Previous_Hash__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <objectPermissions>
+        <allowCreate>false</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>Agent_Audit_Record__c</object>
+        <viewAllRecords>false</viewAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <allowCreate>false</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>false</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>Agent_Audit_Session__c</object>
+        <viewAllRecords>false</viewAllRecords>
+    </objectPermissions>
+    <description>For testing only: lets the user edit AgentLedger entries to see tamper detection work. Verification still detects every edit. Do not assign in production.</description>
     <hasActivationRequired>false</hasActivationRequired>
     <label>AgentLedger Tamper Testing</label>
 </PermissionSet>
