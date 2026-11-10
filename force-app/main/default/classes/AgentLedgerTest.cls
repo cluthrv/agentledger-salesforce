@@ -208,7 +208,7 @@ private class AgentLedgerTest {
             FROM Agent_Audit_Session__c WHERE Id = :sessionId
         ];
 
-        System.assertEquals('Sealed', session.Status__c);
+        System.assertEquals('Closed', session.Status__c);
         System.assertEquals(merkleRoot, session.Merkle_Root__c);
         System.assertEquals(2, session.Record_Count__c);
     }
@@ -237,7 +237,7 @@ private class AgentLedgerTest {
                 '{"q":"post-seal"}', '{"r":"blocked"}', 'Should fail');
             System.assert(false, 'Should have thrown exception');
         } catch (MerkleTreeService.AgentLedgerException e) {
-            System.assert(e.getMessage().contains('Sealed'));
+            System.assert(e.getMessage().contains('Closed'), e.getMessage());
         }
     }
 
@@ -301,7 +301,7 @@ private class AgentLedgerTest {
             FROM Agent_Audit_Session__c WHERE Id = :sessionId
         ];
 
-        System.assertEquals('Sealed', session.Status__c);
+        System.assertEquals('Closed', session.Status__c);
         System.assertEquals(7, session.Record_Count__c);
         System.assertNotEquals(null, session.Merkle_Root__c);
     }

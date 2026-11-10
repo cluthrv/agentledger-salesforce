@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Integrity__c</fullName>
+    <description>Result of the latest verification: Not Checked, Verified or Tampered. Always read with Last Verified At.</description>
+    <label>Integrity</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Not_Checked</fullName>
+                <default>true</default>
+                <label>Not Checked</label>
+            </value>
+            <value>
+                <fullName>Verified</fullName>
+                <default>false</default>
+                <label>Verified</label>
+            </value>
+            <value>
+                <fullName>Tampered</fullName>
+                <default>false</default>
+                <label>Tampered</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

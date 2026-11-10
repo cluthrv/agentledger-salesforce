@@ -411,6 +411,7 @@ private class AgentLedgerActionsTest {
             WHERE Audit_Session__c = :sessionId LIMIT 1
         ];
         stored.Record_Hash__c = 'deadbeef' + '0'.repeat(56);
+        AgentLedgerGuard.allowManualEditsForTest = true; // simulate tampering for the test
         update stored;
 
         List<Agent_Audit_Record__c> records = [
@@ -446,6 +447,7 @@ private class AgentLedgerActionsTest {
             ORDER BY Sequence_Number__c ASC
         ];
         recs[1].Previous_Hash__c = 'wronghash' + '0'.repeat(55);
+        AgentLedgerGuard.allowManualEditsForTest = true; // simulate tampering for the test
         update recs[1];
 
         List<Agent_Audit_Record__c> records = [

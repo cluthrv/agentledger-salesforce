@@ -13,6 +13,7 @@ private class RecordAuditTrailControllerTest {
             SELECT Id FROM Agent_Audit_Session__c WHERE Id = :sessionId
         ];
         session.Related_Record_Id__c = '001000000000001';
+        AgentLedgerGuard.allowManualEditsForTest = true; // store the legacy 15-character form
         update session;
 
         // Add a record

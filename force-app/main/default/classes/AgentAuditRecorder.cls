@@ -13,8 +13,18 @@
  *
  * New runs are hashed with v2 (see HashChainService). Runs recorded before v2
  * keep verifying with v1.
+ *
+ * A run's Status is its lifecycle (Active, Closed, Incomplete). The result of
+ * verification is kept separately in Integrity, with Last Verified At, so a
+ * past result is never shown as current.
  */
 public with sharing class AgentAuditRecorder {
+
+    public static final String STATUS_ACTIVE = 'Active';
+    public static final String STATUS_CLOSED = 'Closed';
+    public static final String STATUS_INCOMPLETE = 'Incomplete';
+    /** Status values written by earlier versions; read as Closed. */
+    private static final Set<String> LEGACY_CLOSED = new Set<String>{ 'Sealed', 'Verified', 'Tampered' };
 
     /** ISO 8601 UTC with milliseconds, e.g. 2026-11-09T14:03:27.481Z. */
     private static final String TIMESTAMP_FORMAT = 'yyyy-MM-dd\'T\'HH:mm:ss.SSS\'Z\'';
@@ -46,12 +56,16 @@ public with sharing class AgentAuditRecorder {
      * @return The Salesforce record Id of the new run
      */
     public static Id startSession(String agentId, String relatedRecordId, String platform) {
+        String relatedId = normalizeId(relatedRecordId);
         Agent_Audit_Session__c session = new Agent_Audit_Session__c(
             Session_Id__c = generateUUID(),
             Agent_Id__c = agentId,
-            Status__c = 'Active',
+            Status__c = STATUS_ACTIVE,
+            Integrity__c = 'Not_Checked',
             Start_Time__c = DateTime.now(),
-            Related_Record_Id__c = normalizeId(relatedRecordId),
+            Related_Record_Id__c = relatedId,
+            Related_Object__c = relatedId == null ? null : Id.valueOf(relatedId).getSObjectType().getDescribe().getName(),
+            Started_By__c = UserInfo.getUserId(),
             Platform__c = platform,
             Record_Count__c = 0,
             Hash_Version__c = HashChainService.HASH_V2
@@ -96,7 +110,7 @@ public with sharing class AgentAuditRecorder {
             FOR UPDATE
         ];
 
-        if (session.Status__c != 'Active') {
+        if (session.Status__c != STATUS_ACTIVE) {
             throw new MerkleTreeService.AgentLedgerException(
                 'Cannot record actions in a ' + session.Status__c +
                 ' session. Sessions are immutable once sealed.');
@@ -144,10 +158,14 @@ public with sharing class AgentAuditRecorder {
             ? HashChainService.hashEntryV2(record, session.Session_Id__c)
             : HashChainService.hashActionRecord(record, UserInfo.getTimeZone().getID());
 
-        insert record;
-
-        session.Record_Count__c = sequenceNumber + 1;
-        update session;
+        AgentLedgerGuard.beginLedgerWrite();
+        try {
+            insert record;
+            session.Record_Count__c = sequenceNumber + 1;
+            update session;
+        } finally {
+            AgentLedgerGuard.endLedgerWrite();
+        }
 
         return record;
     }
@@ -233,13 +251,17 @@ public with sharing class AgentAuditRecorder {
             ? 'Session verified successfully. ' + records.size() + ' records, chain intact.'
             : 'Session verification FAILED. See checks for details.';
 
-        // Reflect the latest result on closed runs; never touch an active run.
-        if (isClosed(session.Status__c)) {
-            String newStatus = result.valid ? 'Verified' : 'Tampered';
-            if (session.Status__c != newStatus) {
-                update new Agent_Audit_Session__c(Id = session.Id, Status__c = newStatus);
-            }
+        // Record the result with its time. Status stays the lifecycle; runs
+        // still holding a status from earlier versions move to Closed.
+        Agent_Audit_Session__c resultRow = new Agent_Audit_Session__c(
+            Id = session.Id,
+            Integrity__c = result.valid ? 'Verified' : 'Tampered',
+            Last_Verified_At__c = DateTime.now()
+        );
+        if (LEGACY_CLOSED.contains(session.Status__c)) {
+            resultRow.Status__c = STATUS_CLOSED;
         }
+        new LedgerWriter().write(resultRow);
         return result;
     }
 
@@ -260,7 +282,8 @@ public with sharing class AgentAuditRecorder {
         return [
             SELECT Id, Name, Session_Id__c, Agent_Id__c, Merkle_Root__c,
                    Status__c, Record_Count__c, Initiator__c, Platform__c,
-                   Start_Time__c, End_Time__c, Hash_Version__c
+                   Start_Time__c, End_Time__c, Hash_Version__c,
+                   Integrity__c, Last_Verified_At__c, Mode__c, Started_By__c, Related_Object__c
             FROM Agent_Audit_Session__c
             WHERE Id = :sessionId
             LIMIT 1
@@ -318,8 +341,24 @@ public with sharing class AgentAuditRecorder {
         ];
     }
 
-    private static Boolean isClosed(String status) {
-        return status == 'Sealed' || status == 'Verified' || status == 'Tampered';
+    /** A run that can no longer take entries: Closed, Incomplete, or a closed status from earlier versions. */
+    public static Boolean isClosed(String status) {
+        return status == STATUS_CLOSED || status == STATUS_INCOMPLETE || LEGACY_CLOSED.contains(status);
+    }
+
+    /**
+     * Writes a verification result. Runs without sharing so anyone who may
+     * verify a run can record the result, even without edit access to it.
+     */
+    private without sharing class LedgerWriter {
+        void write(Agent_Audit_Session__c row) {
+            AgentLedgerGuard.beginLedgerWrite();
+            try {
+                update row;
+            } finally {
+                AgentLedgerGuard.endLedgerWrite();
+            }
+        }
     }
 
     private static String shortHash(String h) {

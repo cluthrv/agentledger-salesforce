@@ -14,6 +14,19 @@ const TYPE_BADGE_MAP = {
     'Delete': 'type-badge type-decision'
 };
 
+// The latest verification result and when it ran. A result is never shown
+// without its time, so an old result cannot pass for a current one.
+function integrityView(integrity, lastVerifiedAt) {
+    const checked = integrity === 'Verified' || integrity === 'Tampered';
+    return {
+        hasIntegrity: checked,
+        integrityLabel: checked
+            ? integrity + ' ' + (lastVerifiedAt ? new Date(lastVerifiedAt).toLocaleString() : '')
+            : '',
+        integrityClass: integrity === 'Verified' ? 'status-pill status-verified' : 'status-pill status-tampered'
+    };
+}
+
 export default class RecordAuditTrail extends LightningElement {
     @api recordId;
     @track sessions = [];
@@ -25,10 +38,10 @@ export default class RecordAuditTrail extends LightningElement {
         if (data) {
             this.sessions = data.map(session => ({
                 ...session,
-                isSealed: session.status === 'Sealed' || session.status === 'Verified' || session.status === 'Tampered',
-                statusClass: session.status === 'Verified' ? 'status-pill status-verified' :
-                             session.status === 'Sealed' ? 'status-pill status-sealed' :
-                             'status-pill status-active',
+                ...integrityView(session.integrity, session.lastVerifiedAt),
+                isSealed: session.closed,
+                status: session.lifecycle,
+                statusClass: session.closed ? 'status-pill status-sealed' : 'status-pill status-active',
                 startTimeFormatted: session.startTime ? new Date(session.startTime).toLocaleString() : '',
                 verifyResult: null,
                 verifyClass: '',
@@ -63,16 +76,11 @@ export default class RecordAuditTrail extends LightningElement {
             // The Apex verify updates the session Status to Verified or Tampered.
             // Reflect that new status in the UI immediately, and keep the
             // Verify button available so a fixed session can be re-verified.
-            const newStatus = result.valid ? 'Verified' : 'Tampered';
             this.sessions = this.sessions.map(s => {
                 if (s.sessionId === sessionId) {
                     return {
                         ...s,
-                        status: newStatus,
-                        isSealed: true,
-                        statusClass: result.valid
-                            ? 'status-pill status-verified'
-                            : 'status-pill status-tampered',
+                        ...integrityView(result.valid ? 'Verified' : 'Tampered', new Date().toISOString()),
                         verifyResult: result,
                         verifyClass: result.valid ? 'verify-result verify-pass' : 'verify-result verify-fail',
                         verifyIcon: result.valid ? 'utility:success' : 'utility:error',

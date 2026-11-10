@@ -3,7 +3,7 @@
     <allowInChatterGroups>false</allowInChatterGroups>
     <compactLayoutAssignment>SYSTEM</compactLayoutAssignment>
     <deploymentStatus>Deployed</deploymentStatus>
-    <description>Represents a sealed audit session from AgentLedger. Contains the Merkle root and session metadata for an AI agent operation.</description>
+    <description>One AgentLedger run: an agent conversation or task, with its entries, status and integrity result.</description>
     <enableActivities>false</enableActivities>
     <enableBulkApi>true</enableBulkApi>
     <enableFeeds>false</enableFeeds>
@@ -14,13 +14,13 @@
     <enableSharing>true</enableSharing>
     <enableStreamingApi>true</enableStreamingApi>
     <externalSharingModel>Private</externalSharingModel>
-    <label>Agent Audit Session</label>
+    <label>Agent Run</label>
     <nameField>
         <displayFormat>AAS-{0000}</displayFormat>
-        <label>Session Number</label>
+        <label>Run Number</label>
         <type>AutoNumber</type>
     </nameField>
-    <pluralLabel>Agent Audit Sessions</pluralLabel>
+    <pluralLabel>Agent Runs</pluralLabel>
     <searchLayouts></searchLayouts>
     <sharingModel>ReadWrite</sharingModel>
     <visibility>Public</visibility>

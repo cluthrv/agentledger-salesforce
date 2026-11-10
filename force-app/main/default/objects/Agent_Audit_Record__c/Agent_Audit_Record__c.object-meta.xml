@@ -3,7 +3,7 @@
     <allowInChatterGroups>false</allowInChatterGroups>
     <compactLayoutAssignment>SYSTEM</compactLayoutAssignment>
     <deploymentStatus>Deployed</deploymentStatus>
-    <description>An individual action record within an AgentLedger audit session. Each record is cryptographically chained to the previous record via SHA-256 hashing.</description>
+    <description>One step of an agent run: a lookup, recommendation, decision or data change, hashed and chained to the step before.</description>
     <enableActivities>false</enableActivities>
     <enableBulkApi>true</enableBulkApi>
     <enableFeeds>false</enableFeeds>
@@ -14,13 +14,13 @@
     <enableSharing>true</enableSharing>
     <enableStreamingApi>true</enableStreamingApi>
     <externalSharingModel>ControlledByParent</externalSharingModel>
-    <label>Agent Audit Record</label>
+    <label>Agent Run Entry</label>
     <nameField>
         <displayFormat>AAR-{00000}</displayFormat>
-        <label>Record Number</label>
+        <label>Entry Number</label>
         <type>AutoNumber</type>
     </nameField>
-    <pluralLabel>Agent Audit Records</pluralLabel>
+    <pluralLabel>Agent Run Entries</pluralLabel>
     <searchLayouts></searchLayouts>
     <sharingModel>ControlledByParent</sharingModel>
     <visibility>Public</visibility>

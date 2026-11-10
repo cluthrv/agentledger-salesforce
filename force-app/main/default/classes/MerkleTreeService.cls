@@ -159,7 +159,7 @@ public with sharing class MerkleTreeService {
         // Only an active run can be sealed. Re-sealing a closed run would
         // recompute the root over whatever the entries hold now, which would
         // hide any change made since the original seal.
-        if (current.Status__c != 'Active') {
+        if (current.Status__c != AgentAuditRecorder.STATUS_ACTIVE) {
             throw new AgentLedgerException('Cannot seal a ' + current.Status__c + ' session. Only an active session can be sealed.');
         }
 
@@ -184,11 +184,16 @@ public with sharing class MerkleTreeService {
         Agent_Audit_Session__c session = new Agent_Audit_Session__c(
             Id = sessionId,
             Merkle_Root__c = merkleRoot,
-            Status__c = 'Sealed',
+            Status__c = AgentAuditRecorder.STATUS_CLOSED,
             End_Time__c = DateTime.now(),
             Record_Count__c = records.size()
         );
-        update session;
+        AgentLedgerGuard.beginLedgerWrite();
+        try {
+            update session;
+        } finally {
+            AgentLedgerGuard.endLedgerWrite();
+        }
 
         return merkleRoot;
     }

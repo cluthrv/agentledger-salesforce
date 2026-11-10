@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomPermission xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Lets a user edit or delete AgentLedger entries and protected run fields, for tamper-detection testing. Verification still detects every such edit. Do not grant in production.</description>
+    <isLicensed>false</isLicensed>
+    <label>AgentLedger: Allow Entry Edits (testing)</label>
+</CustomPermission>

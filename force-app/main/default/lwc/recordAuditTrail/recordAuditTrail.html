@@ -22,6 +22,9 @@
                                 <div class="session-title">
                                     <span class="agent-name">{session.agentId}</span>
                                     <span class={session.statusClass}>{session.status}</span>
+                                    <template if:true={session.hasIntegrity}>
+                                        <span class={session.integrityClass} title="Result of the latest verification">{session.integrityLabel}</span>
+                                    </template>
                                 </div>
                                 <div class="session-meta">
                                     {session.sessionName} &bull; {session.recordCount} actions &bull; {session.startTimeFormatted}

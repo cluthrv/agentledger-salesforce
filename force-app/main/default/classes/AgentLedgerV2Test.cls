@@ -116,16 +116,18 @@ private class AgentLedgerV2Test {
         System.assertEquals(18, rec.Target_Record_Id__c.length(), 'target Id stored as 18 characters');
         System.assert(AgentAuditRecorder.verifySession(sessionId).valid);
 
+        AgentLedgerGuard.allowManualEditsForTest = true; // simulate tampering for the test
         update new Agent_Audit_Record__c(Id = rec.Id, Field_Changes__c = '[{"field":"Status","before":"New","after":"Closed"}]');
         AgentAuditRecorder.VerifySessionResult result = AgentAuditRecorder.verifySession(sessionId);
         System.assert(!result.valid, 'a changed field change is detected');
-        System.assertEquals('Tampered', [SELECT Status__c FROM Agent_Audit_Session__c WHERE Id = :sessionId].Status__c);
+        System.assertEquals('Tampered', [SELECT Integrity__c FROM Agent_Audit_Session__c WHERE Id = :sessionId].Integrity__c);
     }
 
     @isTest
     static void onlyAnActiveRunCanBeSealed() {
         Id sessionId = sealedRun();
         Agent_Audit_Record__c first = [SELECT Id FROM Agent_Audit_Record__c WHERE Audit_Session__c = :sessionId AND Sequence_Number__c = 0];
+        AgentLedgerGuard.allowManualEditsForTest = true; // simulate tampering for the test
         update new Agent_Audit_Record__c(Id = first.Id, Reasoning__c = 'rewritten');
         System.assert(!AgentAuditRecorder.verifySession(sessionId).valid);
 
@@ -136,7 +138,7 @@ private class AgentLedgerV2Test {
         } catch (MerkleTreeService.AgentLedgerException e) {
             System.assert(e.getMessage().contains('Only an active session can be sealed'), e.getMessage());
         }
-        System.assertEquals('Tampered', [SELECT Status__c FROM Agent_Audit_Session__c WHERE Id = :sessionId].Status__c);
+        System.assertEquals('Tampered', [SELECT Integrity__c FROM Agent_Audit_Session__c WHERE Id = :sessionId].Integrity__c);
     }
 
     @isTest

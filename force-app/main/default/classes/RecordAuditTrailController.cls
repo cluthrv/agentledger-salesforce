@@ -32,7 +32,8 @@ public with sharing class RecordAuditTrailController {
         List<Agent_Audit_Session__c> sessions = [
             SELECT Id, Name, Session_Id__c, Agent_Id__c, Merkle_Root__c,
                    Status__c, Record_Count__c, Initiator__c, Platform__c,
-                   Start_Time__c, End_Time__c, Related_Record_Id__c
+                   Start_Time__c, End_Time__c, Related_Record_Id__c,
+                   Integrity__c, Last_Verified_At__c
             FROM Agent_Audit_Session__c
             WHERE Related_Record_Id__c IN :idForms
             ORDER BY Start_Time__c DESC
@@ -64,6 +65,13 @@ public with sharing class RecordAuditTrailController {
             summary.initiator = session.Initiator__c;
             summary.startTime = session.Start_Time__c;
             summary.endTime = session.End_Time__c;
+            summary.closed = AgentAuditRecorder.isClosed(session.Status__c);
+            summary.lifecycle = summary.closed ? AgentAuditRecorder.STATUS_CLOSED : session.Status__c;
+            if (session.Status__c == AgentAuditRecorder.STATUS_INCOMPLETE) {
+                summary.lifecycle = AgentAuditRecorder.STATUS_INCOMPLETE;
+            }
+            summary.integrity = session.Integrity__c;
+            summary.lastVerifiedAt = session.Last_Verified_At__c;
 
             summary.records = new List<AuditRecordInfo>();
             for (Agent_Audit_Record__c rec : entriesBySession.get(session.Id)) {
@@ -102,6 +110,10 @@ public with sharing class RecordAuditTrailController {
         @AuraEnabled public String initiator;
         @AuraEnabled public DateTime startTime;
         @AuraEnabled public DateTime endTime;
+        @AuraEnabled public Boolean closed;
+        @AuraEnabled public String lifecycle;
+        @AuraEnabled public String integrity;
+        @AuraEnabled public DateTime lastVerifiedAt;
         @AuraEnabled public List<AuditRecordInfo> records;
     }
 
