@@ -8,6 +8,8 @@
 @isTest
 private class AgentLedgerTest {
 
+    private static final String RELATED_ID = '006000000000001';
+
     // ── HashChainService Tests ──
 
     @isTest
@@ -141,13 +143,15 @@ private class AgentLedgerTest {
 
         System.assertEquals('test-agent', session.Agent_Id__c);
         System.assertEquals('Active', session.Status__c);
-        System.assertEquals('006000000000001', session.Related_Record_Id__c);
+        System.assertEquals(String.valueOf(Id.valueOf('006000000000001')), session.Related_Record_Id__c,
+            'Related record Id is stored as 18 characters');
+        System.assertEquals(18, session.Related_Record_Id__c.length());
         System.assertEquals('salesforce', session.Platform__c);
     }
 
     @isTest
     static void testRecordAction() {
-        Id sessionId = AgentAuditRecorder.startSession('test-agent', 'test', 'salesforce');
+        Id sessionId = AgentAuditRecorder.startSession('test-agent', RELATED_ID, 'salesforce');
 
         Agent_Audit_Record__c record = AgentAuditRecorder.recordAction(
             sessionId, 'test-agent', 'Query',
@@ -164,7 +168,7 @@ private class AgentLedgerTest {
 
     @isTest
     static void testRecordChaining() {
-        Id sessionId = AgentAuditRecorder.startSession('test-agent', 'test', 'salesforce');
+        Id sessionId = AgentAuditRecorder.startSession('test-agent', RELATED_ID, 'salesforce');
 
         Agent_Audit_Record__c r1 = AgentAuditRecorder.recordAction(
             sessionId, 'test-agent', 'Query',
@@ -187,7 +191,7 @@ private class AgentLedgerTest {
 
     @isTest
     static void testSealSession() {
-        Id sessionId = AgentAuditRecorder.startSession('test-agent', 'test', 'salesforce');
+        Id sessionId = AgentAuditRecorder.startSession('test-agent', RELATED_ID, 'salesforce');
 
         AgentAuditRecorder.recordAction(sessionId, 'test-agent', 'Query',
             '{"q":"test"}', '{"r":"test"}', 'Test action 1');
@@ -211,7 +215,7 @@ private class AgentLedgerTest {
 
     @isTest
     static void testSealEmptySessionThrows() {
-        Id sessionId = AgentAuditRecorder.startSession('test-agent', 'test', 'salesforce');
+        Id sessionId = AgentAuditRecorder.startSession('test-agent', RELATED_ID, 'salesforce');
 
         try {
             AgentAuditRecorder.sealSession(sessionId);
@@ -223,7 +227,7 @@ private class AgentLedgerTest {
 
     @isTest
     static void testRecordAfterSealThrows() {
-        Id sessionId = AgentAuditRecorder.startSession('test-agent', 'test', 'salesforce');
+        Id sessionId = AgentAuditRecorder.startSession('test-agent', RELATED_ID, 'salesforce');
         AgentAuditRecorder.recordAction(sessionId, 'test-agent', 'Query',
             '{"q":"test"}', '{"r":"test"}', 'Action');
         AgentAuditRecorder.sealSession(sessionId);
@@ -239,7 +243,7 @@ private class AgentLedgerTest {
 
     @isTest
     static void testVerifySession() {
-        Id sessionId = AgentAuditRecorder.startSession('test-agent', 'test', 'salesforce');
+        Id sessionId = AgentAuditRecorder.startSession('test-agent', RELATED_ID, 'salesforce');
 
         AgentAuditRecorder.recordAction(sessionId, 'test-agent', 'Query',
             '{"q":"1"}', '{"r":"1"}', 'Action 1');
@@ -262,7 +266,7 @@ private class AgentLedgerTest {
 
     @isTest
     static void testGetSessionRecords() {
-        Id sessionId = AgentAuditRecorder.startSession('test-agent', 'test', 'salesforce');
+        Id sessionId = AgentAuditRecorder.startSession('test-agent', RELATED_ID, 'salesforce');
 
         AgentAuditRecorder.recordAction(sessionId, 'test-agent', 'Query',
             '{}', '{}', 'R1');
@@ -277,9 +281,20 @@ private class AgentLedgerTest {
         System.assertEquals(1, records[1].Sequence_Number__c);
     }
 
+    /** A sealed run with seven entries, the shape the old runDemo produced. */
+    private static Id sealedSevenEntryRun() {
+        Id sessionId = AgentAuditRecorder.startSession('cpq-pricing-agent', RELATED_ID, 'salesforce');
+        for (Integer i = 0; i < 7; i++) {
+            AgentAuditRecorder.recordAction(sessionId, 'cpq-pricing-agent', i == 6 ? 'Create' : 'Query',
+                '{"step":' + i + '}', '{"ok":true}', 'Step ' + i);
+        }
+        AgentAuditRecorder.sealSession(sessionId);
+        return sessionId;
+    }
+
     @isTest
-    static void testRunDemo() {
-        Id sessionId = AgentAuditRecorder.runDemo();
+    static void testSealedSevenEntryRun() {
+        Id sessionId = sealedSevenEntryRun();
 
         Agent_Audit_Session__c session = [
             SELECT Status__c, Merkle_Root__c, Record_Count__c
@@ -293,14 +308,16 @@ private class AgentLedgerTest {
 
     @isTest
     static void testGenerateProofFromSession() {
-        Id sessionId = AgentAuditRecorder.runDemo();
+        Id sessionId = sealedSevenEntryRun();
 
         MerkleTreeService.MerkleProof proof =
             AgentAuditRecorder.generateProof(sessionId, 3);
 
         System.assertNotEquals(null, proof);
         System.assertEquals(3, proof.recordIndex);
-        System.assert(MerkleTreeService.verifyProof(proof),
+        System.assert(MerkleTreeService.verifyProofV2(proof),
             'Proof should verify against session root');
+        System.assertEquals([SELECT Merkle_Root__c FROM Agent_Audit_Session__c WHERE Id = :sessionId].Merkle_Root__c,
+            proof.root, 'Proof root is the sealed root');
     }
 }

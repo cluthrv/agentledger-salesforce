@@ -1,3 +1,6 @@
-# Exclude Agentforce action registrations from the core package.
-# The core package installs in any org, with or without Agentforce.
-**/genAiFunctions/**
+# Files the Salesforce CLI should not deploy or retrieve.
+# Agentforce action registrations (genAiFunctions) are deployed with the rest of
+# the source; do not ignore them here, or deploys silently skip them.
+**/jsconfig.json
+**/.eslintrc.json
+**/__tests__/**

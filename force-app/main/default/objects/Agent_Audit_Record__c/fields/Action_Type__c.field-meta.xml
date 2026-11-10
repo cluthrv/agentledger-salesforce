@@ -55,6 +55,26 @@
                 <default>false</default>
                 <label>Validation</label>
             </value>
+            <value>
+                <fullName>Recommendation</fullName>
+                <default>false</default>
+                <label>Recommendation</label>
+            </value>
+            <value>
+                <fullName>Data_Change</fullName>
+                <default>false</default>
+                <label>Data Change</label>
+            </value>
+            <value>
+                <fullName>Human_Response</fullName>
+                <default>false</default>
+                <label>Human Response</label>
+            </value>
+            <value>
+                <fullName>Error</fullName>
+                <default>false</default>
+                <label>Error</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

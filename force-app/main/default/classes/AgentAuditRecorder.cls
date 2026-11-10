@@ -1,52 +1,68 @@
 /**
  * AgentAuditRecorder
  *
- * The primary Salesforce-native API for AgentLedger. Manages the lifecycle
- * of audit sessions: creation, recording actions, sealing, and verification.
+ * The Salesforce-native API for AgentLedger: start a run (session), record
+ * entries, seal, and verify.
  *
  * Usage:
- *   Id sessionId = AgentAuditRecorder.startSession('pricing-agent', 'dealer-portal', 'salesforce');
- *   AgentAuditRecorder.recordAction(sessionId, 'pricing-agent', 'Query',
- *       '{"query":"get dealer tier"}', '{"tier":"Platinum"}', 'Retrieved dealer profile');
+ *   Id sessionId = AgentAuditRecorder.startSession('case-escalation-agent', caseId, 'agentforce');
+ *   AgentAuditRecorder.recordAction(sessionId, 'case-escalation-agent', 'Decision',
+ *       'Priority: High, Status: New', 'Escalate', 'High priority and not yet escalated');
  *   AgentAuditRecorder.sealSession(sessionId);
  *   AgentAuditRecorder.VerifySessionResult result = AgentAuditRecorder.verifySession(sessionId);
+ *
+ * New runs are hashed with v2 (see HashChainService). Runs recorded before v2
+ * keep verifying with v1.
  */
 public with sharing class AgentAuditRecorder {
 
-    /**
-     * Start a new audit session.
-     *
-     * @param agentId Identifier for the AI agent
-     * @param initiator Who or what initiated the session
-     * @param platform Platform identifier
-     * @return The Salesforce record Id of the new session
-     */
-    public static Id startSession(String agentId, String relatedRecordId, String platform) {
-    Agent_Audit_Session__c session = new Agent_Audit_Session__c(
-        Session_Id__c = generateUUID(),
-        Agent_Id__c = agentId,
-        Status__c = 'Active',
-        Start_Time__c = DateTime.now(),
-        Related_Record_Id__c = relatedRecordId,
-        Platform__c = platform,
-        Record_Count__c = 0
-    );
-    insert session;
-    return session.Id;
-}
+    /** ISO 8601 UTC with milliseconds, e.g. 2026-11-09T14:03:27.481Z. */
+    private static final String TIMESTAMP_FORMAT = 'yyyy-MM-dd\'T\'HH:mm:ss.SSS\'Z\'';
 
     /**
-     * Record an agent action within an existing session.
-     * Automatically computes the SHA-256 hash and chains it to
-     * the previous record.
+     * What to record for one entry. Only actionType, agentId and reasoning are
+     * required; the rest is optional.
+     */
+    public class EntryInput {
+        public String agentId;
+        public String actionType;
+        public String inputContext;
+        public String outputResult;
+        public String reasoning;
+        public String summary;
+        public String targetRecordId;
+        public String targetObject;
+        public String fieldChanges;
+        public String captureMethod;
+        public Integer turnNumber;
+    }
+
+    /**
+     * Start a new run.
      *
-     * @param sessionId The session record Id
-     * @param agentId Agent identifier
-     * @param actionType Type of action (Query, Update, Create, etc.)
-     * @param inputContext JSON string of input context
-     * @param outputResult JSON string of output result
-     * @param reasoning Agent's reasoning for this action
-     * @return The created Agent_Audit_Record__c
+     * @param agentId         Identifier of the agent, e.g. its API name
+     * @param relatedRecordId The record the run is about; stored as 18 characters
+     * @param platform        Platform identifier
+     * @return The Salesforce record Id of the new run
+     */
+    public static Id startSession(String agentId, String relatedRecordId, String platform) {
+        Agent_Audit_Session__c session = new Agent_Audit_Session__c(
+            Session_Id__c = generateUUID(),
+            Agent_Id__c = agentId,
+            Status__c = 'Active',
+            Start_Time__c = DateTime.now(),
+            Related_Record_Id__c = normalizeId(relatedRecordId),
+            Platform__c = platform,
+            Record_Count__c = 0,
+            Hash_Version__c = HashChainService.HASH_V2
+        );
+        insert session;
+        return session.Id;
+    }
+
+    /**
+     * Record an entry reported by the agent. Kept for the Record Agent Action
+     * action and existing callers.
      */
     public static Agent_Audit_Record__c recordAction(
         Id sessionId,
@@ -56,12 +72,28 @@ public with sharing class AgentAuditRecorder {
         String outputResult,
         String reasoning
     ) {
-        // Verify session is still active
+        EntryInput entry = new EntryInput();
+        entry.agentId = agentId;
+        entry.actionType = actionType;
+        entry.inputContext = inputContext;
+        entry.outputResult = outputResult;
+        entry.reasoning = reasoning;
+        entry.captureMethod = 'Reported_by_Agent';
+        return recordEntry(sessionId, entry);
+    }
+
+    /**
+     * Record an entry: compute its hash and chain it to the previous one.
+     * The run is locked for the duration, so concurrent calls cannot take the
+     * same sequence number.
+     */
+    public static Agent_Audit_Record__c recordEntry(Id sessionId, EntryInput entry) {
         Agent_Audit_Session__c session = [
-            SELECT Id, Status__c, Record_Count__c
+            SELECT Id, Status__c, Record_Count__c, Session_Id__c, Hash_Version__c
             FROM Agent_Audit_Session__c
             WHERE Id = :sessionId
             LIMIT 1
+            FOR UPDATE
         ];
 
         if (session.Status__c != 'Active') {
@@ -70,10 +102,8 @@ public with sharing class AgentAuditRecorder {
                 ' session. Sessions are immutable once sealed.');
         }
 
-        // Get the previous record's hash for chaining
-        Integer sequenceNumber = (Integer) session.Record_Count__c;
+        Integer sequenceNumber = session.Record_Count__c == null ? 0 : session.Record_Count__c.intValue();
         String previousHash = null;
-
         if (sequenceNumber > 0) {
             List<Agent_Audit_Record__c> prevRecords = [
                 SELECT Record_Hash__c
@@ -87,30 +117,35 @@ public with sharing class AgentAuditRecorder {
             }
         }
 
-        // Create the record
+        // One clock reading for both the stored timestamp and the hash.
+        DateTime now = DateTime.now();
+
         Agent_Audit_Record__c record = new Agent_Audit_Record__c(
             Audit_Session__c = sessionId,
+            Entry_Id__c = generateUUID(),
             Sequence_Number__c = sequenceNumber,
-            Action_Timestamp__c = DateTime.now(),
-            Agent_Id__c = agentId,
-            Action_Type__c = actionType,
-            Input_Context__c = inputContext,
-            Output_Result__c = outputResult,
-            Reasoning__c = reasoning,
+            Action_Timestamp__c = now,
+            Timestamp_Text__c = now.formatGmt(TIMESTAMP_FORMAT),
+            Agent_Id__c = entry.agentId,
+            Action_Type__c = entry.actionType,
+            Input_Context__c = entry.inputContext,
+            Output_Result__c = entry.outputResult,
+            Reasoning__c = entry.reasoning,
+            Summary__c = entry.summary,
+            Target_Record_Id__c = normalizeId(entry.targetRecordId),
+            Target_Object__c = entry.targetObject,
+            Field_Changes__c = entry.fieldChanges,
+            Capture_Method__c = entry.captureMethod,
+            Turn_Number__c = entry.turnNumber,
             Previous_Hash__c = previousHash
         );
 
-        // Compute hash before insert so we can include the record fields
-        // We use a temporary hash based on content since we don't have the Id yet
-        String tempHash = computePreInsertHash(
-            sessionId, sequenceNumber, agentId, actionType,
-            inputContext, outputResult, reasoning, previousHash
-        );
-        record.Record_Hash__c = tempHash;
+        record.Record_Hash__c = HashChainService.versionOf(session.Hash_Version__c) == HashChainService.HASH_V2
+            ? HashChainService.hashEntryV2(record, session.Session_Id__c)
+            : HashChainService.hashActionRecord(record, UserInfo.getTimeZone().getID());
 
         insert record;
 
-        // Update session record count
         session.Record_Count__c = sequenceNumber + 1;
         update session;
 
@@ -118,52 +153,39 @@ public with sharing class AgentAuditRecorder {
     }
 
     /**
-     * Seal a session. Computes the Merkle root and prevents further recording.
+     * Seal an active run: compute the Merkle root and stop further recording.
      *
-     * @param sessionId The session record Id
-     * @return The computed Merkle root hash
+     * @param sessionId The run's record Id
+     * @return The Merkle root
      */
     public static String sealSession(Id sessionId) {
-            String merkleRoot = MerkleTreeService.sealSession(sessionId);
-
- 
-
-    return merkleRoot;
+        return MerkleTreeService.sealSession(sessionId);
     }
 
     /**
-     * Verify the complete integrity of a session.
-     * Checks hash chain integrity and Merkle root.
+     * Verify a run: entry hashes and chain, the Merkle root (once sealed), and
+     * the entry count. Uses the run's hash version.
      *
-     * @param sessionId The session record Id
-     * @return VerifySessionResult with detailed outcomes
+     * @param sessionId The run's record Id
+     * @return VerifySessionResult with one check per test
      */
     @AuraEnabled
     public static VerifySessionResult verifySession(Id sessionId) {
         VerifySessionResult result = new VerifySessionResult();
         result.checks = new List<VerificationCheck>();
 
-        // Get session
         Agent_Audit_Session__c session = [
-            SELECT Id, Status__c, Merkle_Root__c, Record_Count__c
+            SELECT Id, Status__c, Merkle_Root__c, Record_Count__c, Session_Id__c, Hash_Version__c
             FROM Agent_Audit_Session__c
             WHERE Id = :sessionId
             LIMIT 1
         ];
 
-        // Get all records ordered by sequence
-        List<Agent_Audit_Record__c> records = [
-            SELECT Id, Name, Audit_Session__c, Sequence_Number__c,
-                   Action_Timestamp__c, Agent_Id__c, Action_Type__c,
-                   Input_Context__c, Output_Result__c, Reasoning__c,
-                   Record_Hash__c, Previous_Hash__c
-            FROM Agent_Audit_Record__c
-            WHERE Audit_Session__c = :sessionId
-            ORDER BY Sequence_Number__c ASC
-        ];
+        List<Agent_Audit_Record__c> records = queryEntries(sessionId);
 
-        // Check 1: Hash chain integrity
-        HashChainService.VerificationResult chainResult = HashChainService.verifyChain(records);
+        // Check 1: entry hashes and chain linkage
+        HashChainService.VerificationResult chainResult =
+            HashChainService.verifyChain(records, session.Hash_Version__c, session.Session_Id__c);
         VerificationCheck chainCheck = new VerificationCheck();
         chainCheck.name = 'hash_chain_integrity';
         chainCheck.passed = chainResult.valid;
@@ -172,34 +194,33 @@ public with sharing class AgentAuditRecorder {
             : String.join(chainResult.errors, '; ');
         result.checks.add(chainCheck);
 
-        // Check 2: Merkle root (only if sealed)
-        if (session.Status__c == 'Sealed' || session.Status__c == 'Verified') {
+        // Check 2: Merkle root, once sealed
+        if (isClosed(session.Status__c)) {
             List<String> hashes = new List<String>();
             for (Agent_Audit_Record__c rec : records) {
                 hashes.add(rec.Record_Hash__c);
             }
-            String recomputedRoot = MerkleTreeService.computeMerkleRoot(hashes);
-            Boolean rootValid = recomputedRoot == session.Merkle_Root__c;
+            String recomputedRoot = MerkleTreeService.computeRoot(hashes, session.Hash_Version__c);
+            Boolean rootValid = session.Merkle_Root__c != null && recomputedRoot == session.Merkle_Root__c;
 
             VerificationCheck rootCheck = new VerificationCheck();
             rootCheck.name = 'merkle_root_integrity';
             rootCheck.passed = rootValid;
             rootCheck.detail = rootValid
                 ? 'Merkle root verified: ' + session.Merkle_Root__c.substring(0, 16) + '...'
-                : 'Merkle root mismatch: stored ' + session.Merkle_Root__c.substring(0, 16) +
-                  '... vs computed ' + (recomputedRoot != null ? recomputedRoot.substring(0, 16) : 'null') + '...';
+                : 'Merkle root mismatch: stored ' + shortHash(session.Merkle_Root__c) +
+                  ' vs computed ' + shortHash(recomputedRoot);
             result.checks.add(rootCheck);
         }
 
-        // Check 3: Record count
+        // Check 3: entry count
+        Integer expected = session.Record_Count__c == null ? 0 : session.Record_Count__c.intValue();
         VerificationCheck countCheck = new VerificationCheck();
         countCheck.name = 'record_count';
-        countCheck.passed = records.size() == (Integer) session.Record_Count__c;
-        countCheck.detail = 'Session contains ' + records.size() + ' record(s), expected ' +
-            session.Record_Count__c.intValue();
+        countCheck.passed = records.size() == expected;
+        countCheck.detail = 'Session contains ' + records.size() + ' record(s), expected ' + expected;
         result.checks.add(countCheck);
 
-        // Overall result
         result.valid = true;
         for (VerificationCheck check : result.checks) {
             if (!check.passed) {
@@ -212,14 +233,11 @@ public with sharing class AgentAuditRecorder {
             ? 'Session verified successfully. ' + records.size() + ' records, chain intact.'
             : 'Session verification FAILED. See checks for details.';
 
-        // Update session status to reflect the latest verification result.
-        // Only for sessions that have been sealed (Sealed, Verified, or Tampered);
-        // never touch an Active, not-yet-sealed session.
-        if (session.Status__c == 'Sealed' || session.Status__c == 'Verified' || session.Status__c == 'Tampered') {
+        // Reflect the latest result on closed runs; never touch an active run.
+        if (isClosed(session.Status__c)) {
             String newStatus = result.valid ? 'Verified' : 'Tampered';
             if (session.Status__c != newStatus) {
-                session.Status__c = newStatus;
-                update session;
+                update new Agent_Audit_Session__c(Id = session.Id, Status__c = newStatus);
             }
         }
         return result;
@@ -231,15 +249,7 @@ public with sharing class AgentAuditRecorder {
      */
     @AuraEnabled(cacheable=true)
     public static List<Agent_Audit_Record__c> getSessionRecords(Id sessionId) {
-        return [
-            SELECT Id, Name, Sequence_Number__c, Action_Timestamp__c,
-                   Agent_Id__c, Action_Type__c, Input_Context__c,
-                   Output_Result__c, Reasoning__c, Record_Hash__c,
-                   Previous_Hash__c
-            FROM Agent_Audit_Record__c
-            WHERE Audit_Session__c = :sessionId
-            ORDER BY Sequence_Number__c ASC
-        ];
+        return queryEntries(sessionId);
     }
 
     /**
@@ -250,7 +260,7 @@ public with sharing class AgentAuditRecorder {
         return [
             SELECT Id, Name, Session_Id__c, Agent_Id__c, Merkle_Root__c,
                    Status__c, Record_Count__c, Initiator__c, Platform__c,
-                   Start_Time__c, End_Time__c
+                   Start_Time__c, End_Time__c, Hash_Version__c
             FROM Agent_Audit_Session__c
             WHERE Id = :sessionId
             LIMIT 1
@@ -258,115 +268,76 @@ public with sharing class AgentAuditRecorder {
     }
 
     /**
-     * Generate a Merkle proof for a specific record in a sealed session.
-     * Exposed to LWC.
+     * Generate a Merkle proof for one record of a run, with the run's hash version.
      */
     @AuraEnabled
     public static MerkleTreeService.MerkleProof generateProof(Id sessionId, Integer recordIndex) {
-        List<Agent_Audit_Record__c> records = [
+        Agent_Audit_Session__c session = [
+            SELECT Hash_Version__c FROM Agent_Audit_Session__c WHERE Id = :sessionId LIMIT 1
+        ];
+        List<String> hashes = new List<String>();
+        for (Agent_Audit_Record__c rec : [
             SELECT Record_Hash__c
             FROM Agent_Audit_Record__c
             WHERE Audit_Session__c = :sessionId
             ORDER BY Sequence_Number__c ASC
-        ];
-
-        List<String> hashes = new List<String>();
-        for (Agent_Audit_Record__c rec : records) {
+        ]) {
             hashes.add(rec.Record_Hash__c);
         }
-
-        return MerkleTreeService.generateProof(hashes, recordIndex);
+        return HashChainService.versionOf(session.Hash_Version__c) == HashChainService.HASH_V2
+            ? MerkleTreeService.generateProofV2(hashes, recordIndex)
+            : MerkleTreeService.generateProof(hashes, recordIndex);
     }
 
     /**
-     * Run a complete demo that creates a session with sample B2B pricing
-     * actions, seals it, and verifies it. Useful for testing and demos.
-     *
-     * @return The session Id of the created demo session
+     * An 18-character Id for any 15- or 18-character Id; blank stays null.
+     * Throws on a value that is not a Salesforce Id.
      */
-    public static Id runDemo() {
-        // Start session
-        Id sessionId = startSession('cpq-pricing-agent', 'dealer-portal', 'salesforce');
+    public static String normalizeId(String value) {
+        if (String.isBlank(value)) {
+            return null;
+        }
+        try {
+            return String.valueOf(Id.valueOf(value.trim()));
+        } catch (StringException e) {
+            throw new MerkleTreeService.AgentLedgerException('Not a valid Salesforce record Id: ' + value);
+        }
+    }
 
-        // Record actions
-        recordAction(sessionId, 'cpq-pricing-agent', 'Query',
-            '{"system":"CRM","dealerId":"DEALER-100"}',
-            '{"name":"Midwest Heavy Equipment","tier":"Platinum","region":"Midwest"}',
-            'Retrieved dealer profile. Midwest Heavy Equipment is a Platinum tier dealer.');
+    private static List<Agent_Audit_Record__c> queryEntries(Id sessionId) {
+        return [
+            SELECT Id, Name, Audit_Session__c, Sequence_Number__c, Entry_Id__c,
+                   Action_Timestamp__c, Timestamp_Text__c, Agent_Id__c, Action_Type__c,
+                   Input_Context__c, Output_Result__c, Reasoning__c, Summary__c,
+                   Target_Record_Id__c, Target_Object__c, Field_Changes__c,
+                   Capture_Method__c, Turn_Number__c,
+                   Record_Hash__c, Previous_Hash__c, CreatedBy.TimeZoneSidKey
+            FROM Agent_Audit_Record__c
+            WHERE Audit_Session__c = :sessionId
+            ORDER BY Sequence_Number__c ASC
+        ];
+    }
 
-        recordAction(sessionId, 'cpq-pricing-agent', 'Validation',
-            '{"creditStatus":"approved","creditLimit":500000}',
-            '{"decision":"proceed","approved":true}',
-            'Credit status approved. Limit: $500,000. Proceeding with quote.');
+    private static Boolean isClosed(String status) {
+        return status == 'Sealed' || status == 'Verified' || status == 'Tampered';
+    }
 
-        recordAction(sessionId, 'cpq-pricing-agent', 'Query',
-            '{"system":"CPQ","skus":["HYD-100","HYD-200","HYD-300","HYD-400"]}',
-            '{"available":4,"unavailable":[]}',
-            'Queried CPQ catalog. All 4 requested SKUs available.');
-
-        recordAction(sessionId, 'cpq-pricing-agent', 'Query',
-            '{"system":"CPQ","tier":"Platinum"}',
-            '{"tierDiscount":0.20,"volumeThreshold":50000,"volumeDiscount":0.05}',
-            'Platinum tier rules: 20% base discount, 5% volume above $50,000.');
-
-        recordAction(sessionId, 'cpq-pricing-agent', 'Calculation',
-            '{"subtotal":200500,"tierDiscount":0.20,"volumeDiscount":0.05}',
-            '{"tierAmount":40100,"volumeAmount":10025,"effectiveRate":0.25,"finalTotal":150375}',
-            'Subtotal $200,500. Tier 20% + volume 5% = 25%. Final: $150,375.');
-
-        recordAction(sessionId, 'cpq-pricing-agent', 'Validation',
-            '{"orderTotal":150375,"creditLimit":500000}',
-            '{"withinLimit":true,"headroom":349625}',
-            'Order $150,375 within $500,000 limit. Headroom: $349,625.');
-
-        recordAction(sessionId, 'cpq-pricing-agent', 'Create',
-            '{"dealerId":"DEALER-100","total":150375,"lineItems":4}',
-            '{"quoteId":"Q-2026-4817","status":"pending_review"}',
-            'Generated quote Q-2026-4817. 4 line items, $150,375. Valid 30 days.');
-
-        // Seal
-        sealSession(sessionId);
-
-        return sessionId;
+    private static String shortHash(String h) {
+        return h == null ? 'null' : h.substring(0, Math.min(16, h.length())) + '...';
     }
 
     /**
-     * Compute hash before insert (when we don't have the Salesforce Id yet).
-     * Uses content fields only for deterministic hashing.
-     */
-    private static String computePreInsertHash(
-        Id sessionId, Integer sequenceNumber, String agentId,
-        String actionType, String inputContext, String outputResult,
-        String reasoning, String previousHash
-    ) {
-        List<String> parts = new List<String>();
-        parts.add(String.valueOf(sessionId));
-        parts.add(String.valueOf(sequenceNumber));
-        parts.add(String.valueOf(DateTime.now()));
-        parts.add(safeString(agentId));
-        parts.add(safeString(actionType));
-        parts.add(safeString(inputContext));
-        parts.add(safeString(outputResult));
-        parts.add(safeString(reasoning));
-        parts.add(safeString(previousHash));
-
-        String canonical = JSON.serialize(parts);
-        return HashChainService.sha256(canonical);
-    }
-
-    private static String safeString(String value) {
-        return value != null ? value : '';
-    }
-
-    /**
-     * Generate a UUID v4 (pseudo-random).
+     * A version 4 UUID.
      */
     private static String generateUUID() {
         String hex = EncodingUtil.convertToHex(Crypto.generateAesKey(128));
+        // Version 4 in the 13th digit; RFC 4122 variant (8, 9, a or b) in the 17th.
+        String variant = '89ab'.substring(Math.mod('0123456789abcdef'.indexOf(hex.substring(16, 17)), 4),
+                                         Math.mod('0123456789abcdef'.indexOf(hex.substring(16, 17)), 4) + 1);
         return hex.substring(0, 8) + '-' +
                hex.substring(8, 12) + '-4' +
                hex.substring(13, 16) + '-' +
-               hex.substring(16, 20) + '-' +
+               variant + hex.substring(17, 20) + '-' +
                hex.substring(20, 32);
     }
 

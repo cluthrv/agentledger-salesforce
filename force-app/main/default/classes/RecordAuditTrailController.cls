@@ -15,15 +15,43 @@ public with sharing class RecordAuditTrailController {
     @AuraEnabled(cacheable=true)
     public static List<SessionSummary> getSessionsForRecord(String recordId) {
         List<SessionSummary> summaries = new List<SessionSummary>();
+        if (String.isBlank(recordId)) {
+            return summaries;
+        }
+
+        // Runs store 18-character Ids; older runs may hold the 15-character form.
+        Set<String> idForms = new Set<String>{ recordId };
+        try {
+            String full = String.valueOf(Id.valueOf(recordId));
+            idForms.add(full);
+            idForms.add(full.left(15));
+        } catch (StringException e) {
+            // Not an Id: match the value as given.
+        }
 
         List<Agent_Audit_Session__c> sessions = [
             SELECT Id, Name, Session_Id__c, Agent_Id__c, Merkle_Root__c,
                    Status__c, Record_Count__c, Initiator__c, Platform__c,
                    Start_Time__c, End_Time__c, Related_Record_Id__c
             FROM Agent_Audit_Session__c
-            WHERE Related_Record_Id__c = :recordId
+            WHERE Related_Record_Id__c IN :idForms
             ORDER BY Start_Time__c DESC
         ];
+
+        // All entries for these runs in one query.
+        Map<Id, List<Agent_Audit_Record__c>> entriesBySession = new Map<Id, List<Agent_Audit_Record__c>>();
+        for (Agent_Audit_Session__c session : sessions) {
+            entriesBySession.put(session.Id, new List<Agent_Audit_Record__c>());
+        }
+        for (Agent_Audit_Record__c rec : [
+            SELECT Id, Name, Audit_Session__c, Sequence_Number__c, Action_Timestamp__c,
+                   Agent_Id__c, Action_Type__c, Reasoning__c, Record_Hash__c, Previous_Hash__c
+            FROM Agent_Audit_Record__c
+            WHERE Audit_Session__c IN :entriesBySession.keySet()
+            ORDER BY Audit_Session__c, Sequence_Number__c ASC
+        ]) {
+            entriesBySession.get(rec.Audit_Session__c).add(rec);
+        }
 
         for (Agent_Audit_Session__c session : sessions) {
             SessionSummary summary = new SessionSummary();
@@ -37,19 +65,8 @@ public with sharing class RecordAuditTrailController {
             summary.startTime = session.Start_Time__c;
             summary.endTime = session.End_Time__c;
 
-            // Get the audit records for this session
-            List<Agent_Audit_Record__c> records = [
-                SELECT Id, Name, Sequence_Number__c, Action_Timestamp__c,
-                       Agent_Id__c, Action_Type__c, Input_Context__c,
-                       Output_Result__c, Reasoning__c, Record_Hash__c,
-                       Previous_Hash__c
-                FROM Agent_Audit_Record__c
-                WHERE Audit_Session__c = :session.Id
-                ORDER BY Sequence_Number__c ASC
-            ];
-
             summary.records = new List<AuditRecordInfo>();
-            for (Agent_Audit_Record__c rec : records) {
+            for (Agent_Audit_Record__c rec : entriesBySession.get(session.Id)) {
                 AuditRecordInfo info = new AuditRecordInfo();
                 info.recordId = rec.Id;
                 info.sequenceNumber = Integer.valueOf(rec.Sequence_Number__c);

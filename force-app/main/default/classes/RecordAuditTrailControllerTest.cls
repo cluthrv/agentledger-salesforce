@@ -5,7 +5,7 @@ private class RecordAuditTrailControllerTest {
     static void testGetSessionsForRecord() {
         // Create a session linked to a fake record Id
         Id sessionId = AgentAuditRecorder.startSession(
-            'test-agent', 'test', 'salesforce'
+            'test-agent', '001000000000001', 'salesforce'
         );
 
         // Link it to a record
@@ -30,7 +30,7 @@ private class RecordAuditTrailControllerTest {
     @isTest
     static void testVerifySessionFromRecord() {
         Id sessionId = AgentAuditRecorder.startSession(
-            'test-agent', 'test', 'salesforce'
+            'test-agent', '001000000000001', 'salesforce'
         );
         AgentAuditRecorder.recordAction(sessionId, 'test-agent', 'Query',
             '{}', '{}', 'Test');

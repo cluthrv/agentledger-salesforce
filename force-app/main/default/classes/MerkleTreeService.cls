@@ -148,6 +148,21 @@ public with sharing class MerkleTreeService {
      * @return The computed Merkle root hash
      */
     public static String sealSession(Id sessionId) {
+        // Lock the run so a concurrent record or seal cannot interleave.
+        Agent_Audit_Session__c current = [
+            SELECT Id, Status__c, Hash_Version__c
+            FROM Agent_Audit_Session__c
+            WHERE Id = :sessionId
+            LIMIT 1
+            FOR UPDATE
+        ];
+        // Only an active run can be sealed. Re-sealing a closed run would
+        // recompute the root over whatever the entries hold now, which would
+        // hide any change made since the original seal.
+        if (current.Status__c != 'Active') {
+            throw new AgentLedgerException('Cannot seal a ' + current.Status__c + ' session. Only an active session can be sealed.');
+        }
+
         List<Agent_Audit_Record__c> records = [
             SELECT Record_Hash__c
             FROM Agent_Audit_Record__c
@@ -164,7 +179,7 @@ public with sharing class MerkleTreeService {
             hashes.add(record.Record_Hash__c);
         }
 
-        String merkleRoot = computeMerkleRoot(hashes);
+        String merkleRoot = computeRoot(hashes, current.Hash_Version__c);
 
         Agent_Audit_Session__c session = new Agent_Audit_Session__c(
             Id = sessionId,
@@ -176,6 +191,110 @@ public with sharing class MerkleTreeService {
         update session;
 
         return merkleRoot;
+    }
+
+    // ── v2: RFC 6962 style, the same tree as computeMerkleRootV2 in the open-source library ──
+    //   leaf = SHA-256(0x00 || record hash bytes)
+    //   node = SHA-256(0x01 || left bytes || right bytes)
+    // An odd node at the end of a level is carried up unchanged, never duplicated.
+
+    /** The root for a run's hash version: v2, or v1 (the tree above) when blank. */
+    public static String computeRoot(List<String> hashes, String hashVersion) {
+        return HashChainService.versionOf(hashVersion) == HashChainService.HASH_V2
+            ? computeMerkleRootV2(hashes)
+            : computeMerkleRoot(hashes);
+    }
+
+    public static String merkleLeafV2(String recordHash) {
+        return digestHex('00' + requireHash(recordHash));
+    }
+
+    public static String merkleNodeV2(String left, String right) {
+        return digestHex('01' + requireHash(left) + requireHash(right));
+    }
+
+    public static String computeMerkleRootV2(List<String> hashes) {
+        if (hashes == null || hashes.isEmpty()) {
+            return null;
+        }
+        List<String> level = new List<String>();
+        for (String h : hashes) {
+            level.add(merkleLeafV2(h));
+        }
+        while (level.size() > 1) {
+            level = nextLevelV2(level);
+        }
+        return level[0];
+    }
+
+    /**
+     * A v2 proof for one record. A level where the record's node is carried up
+     * adds no sibling.
+     */
+    public static MerkleProof generateProofV2(List<String> hashes, Integer recordIndex) {
+        if (hashes == null || hashes.isEmpty() || recordIndex == null ||
+            recordIndex < 0 || recordIndex >= hashes.size()) {
+            return null;
+        }
+        List<String> level = new List<String>();
+        for (String h : hashes) {
+            level.add(merkleLeafV2(h));
+        }
+        List<ProofSibling> siblings = new List<ProofSibling>();
+        Integer index = recordIndex;
+        while (level.size() > 1) {
+            Integer pair = Math.mod(index, 2) == 0 ? index + 1 : index - 1;
+            if (pair < level.size()) {
+                ProofSibling sibling = new ProofSibling();
+                sibling.hash = level[pair];
+                sibling.position = Math.mod(index, 2) == 0 ? 'right' : 'left';
+                siblings.add(sibling);
+            }
+            level = nextLevelV2(level);
+            index = index / 2;
+        }
+        MerkleProof proof = new MerkleProof();
+        proof.recordIndex = recordIndex;
+        proof.recordHash = hashes[recordIndex];
+        proof.siblings = siblings;
+        proof.root = level[0];
+        return proof;
+    }
+
+    public static Boolean verifyProofV2(MerkleProof proof) {
+        if (proof == null || proof.siblings == null || proof.recordHash == null) {
+            return false;
+        }
+        try {
+            String current = merkleLeafV2(proof.recordHash);
+            for (ProofSibling sibling : proof.siblings) {
+                current = sibling.position == 'right'
+                    ? merkleNodeV2(current, sibling.hash)
+                    : merkleNodeV2(sibling.hash, current);
+            }
+            return current == proof.root;
+        } catch (AgentLedgerException e) {
+            return false;
+        }
+    }
+
+    private static List<String> nextLevelV2(List<String> level) {
+        List<String> next = new List<String>();
+        for (Integer i = 0; i < level.size(); i += 2) {
+            next.add(i + 1 < level.size() ? merkleNodeV2(level[i], level[i + 1]) : level[i]);
+        }
+        return next;
+    }
+
+    private static String digestHex(String hexBytes) {
+        return EncodingUtil.convertToHex(Crypto.generateDigest('SHA-256', EncodingUtil.convertFromHex(hexBytes)));
+    }
+
+    private static String requireHash(String h) {
+        if (h == null || !Pattern.matches('[0-9a-f]{64}', h)) {
+            throw new AgentLedgerException('Not a SHA-256 hex hash: ' + h);
+        }
+        return h;
     }
 
     /**

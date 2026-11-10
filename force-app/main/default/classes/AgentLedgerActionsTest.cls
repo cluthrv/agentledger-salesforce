@@ -50,7 +50,8 @@ private class AgentLedgerActionsTest {
             FROM Agent_Audit_Session__c WHERE Id = :sessionId
         ];
         System.assertEquals('opportunity-qualification-agent', s.Agent_Id__c);
-        System.assertEquals('006000000000001', s.Related_Record_Id__c);
+        System.assertEquals(String.valueOf(Id.valueOf('006000000000001')), s.Related_Record_Id__c,
+            'stored as 18 characters');
         System.assertEquals('salesforce', s.Platform__c);
         System.assertEquals('Active', s.Status__c);
     }

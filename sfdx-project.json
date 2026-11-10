@@ -28,7 +28,7 @@
   "name": "agentledger-sfdc",
   "namespace": "",
   "sfdcLoginUrl": "https://login.salesforce.com",
-  "sourceApiVersion": "61.0",
+  "sourceApiVersion": "65.0",
   "packageAliases": {
     "AgentLedger": "0HogK0000003AndSAE",
     "AgentLedger Core": "0HogK0000003BN7SAM",
