@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiFunction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Updates fields on any Salesforce record and logs the change, with before and after values, in the AgentLedger activity log. Use this instead of the standard Update Record action.</description>
+    <developerName>Update_Record_AgentLedger</developerName>
+    <invocationTarget>UpdateRecordAgentLedgerAction</invocationTarget>
+    <invocationTargetType>apex</invocationTargetType>
+    <isConfirmationRequired>false</isConfirmationRequired>
+    <isIncludeInProgressIndicator>true</isIncludeInProgressIndicator>
+    <localDeveloperName>Update_Record_AgentLedger</localDeveloperName>
+    <masterLabel>Update Record (AgentLedger)</masterLabel>
+    <progressIndicatorMessage>Updating the record...</progressIndicatorMessage>
+</GenAiFunction>

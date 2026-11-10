@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiFunction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Creates a Salesforce record of any object and logs it, with its field values, in the AgentLedger activity log.</description>
+    <developerName>Create_Record_AgentLedger</developerName>
+    <invocationTarget>CreateRecordAgentLedgerAction</invocationTarget>
+    <invocationTargetType>apex</invocationTargetType>
+    <isConfirmationRequired>false</isConfirmationRequired>
+    <isIncludeInProgressIndicator>true</isIncludeInProgressIndicator>
+    <localDeveloperName>Create_Record_AgentLedger</localDeveloperName>
+    <masterLabel>Create Record (AgentLedger)</masterLabel>
+    <progressIndicatorMessage>Creating the record...</progressIndicatorMessage>
+</GenAiFunction>

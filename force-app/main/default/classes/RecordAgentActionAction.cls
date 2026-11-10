@@ -13,13 +13,16 @@
 public with sharing class RecordAgentActionAction {
 
     public class Request {
-        @InvocableVariable(label='Session Id' description='The sessionId returned by Start AgentLedger Session.' required=true)
+        @InvocableVariable(label='Session Id' description='Optional. The run to record into, as returned by Start AgentLedger Session. When blank, the open run of this agent is used, or a new one is started.' required=false)
         public Id sessionId;
+
+        @InvocableVariable(label='Related Record Id' description='Optional. The record this step is about, used to find or start the run when no Session Id is given.' required=false)
+        public String relatedRecordId;
 
         @InvocableVariable(label='Agent Id' description='Identifier for the AI agent. Should match the agentId used to start the session.' required=true)
         public String agentId;
 
-        @InvocableVariable(label='Action Type' description='One of: Query, Validation, Decision, Calculation, Create, Update, Escalation, Tool_Call, Delete.' required=true)
+        @InvocableVariable(label='Action Type' description='One of: Recommendation, Decision, Human_Response, Query, Validation, Calculation, Create, Update, Data_Change, Escalation, Tool_Call, Delete, Error.' required=true)
         public String actionType;
 
         @InvocableVariable(label='Input Context' description='What the agent evaluated. Plain text or JSON summary of the inputs considered for this step.' required=false)
@@ -51,7 +54,8 @@ public with sharing class RecordAgentActionAction {
 
     private static final Set<String> VALID_ACTION_TYPES = new Set<String>{
         'Query', 'Validation', 'Decision', 'Calculation',
-        'Create', 'Update', 'Escalation', 'Tool_Call', 'Delete'
+        'Create', 'Update', 'Escalation', 'Tool_Call', 'Delete',
+        'Recommendation', 'Data_Change', 'Human_Response', 'Error'
     };
 
     @InvocableMethod(
@@ -65,19 +69,6 @@ public with sharing class RecordAgentActionAction {
         for (Request req : requests) {
             Result res = new Result();
             try {
-                if (req.sessionId == null && String.isNotBlank(req.agentId)
-                    && !AgentLedgerSettings.forAgent(req.agentId).enabled) {
-                    // AgentLedger is turned off for this agent: nothing to record.
-                    res.success = true;
-                    results.add(res);
-                    continue;
-                }
-                if (req.sessionId == null) {
-                    res.success = false;
-                    res.errorMessage = 'Session Id is required.';
-                    results.add(res);
-                    continue;
-                }
                 if (String.isBlank(req.agentId)) {
                     res.success = false;
                     res.errorMessage = 'Agent Id is required.';
@@ -98,8 +89,16 @@ public with sharing class RecordAgentActionAction {
                     continue;
                 }
 
+                Id runId = AgentLedgerRuns.resolve(req.sessionId, req.agentId, req.relatedRecordId);
+                if (runId == null) {
+                    // AgentLedger is turned off for this agent: nothing to record.
+                    res.success = true;
+                    results.add(res);
+                    continue;
+                }
+
                 Agent_Audit_Record__c record = AgentAuditRecorder.recordAction(
-                    req.sessionId,
+                    runId,
                     req.agentId,
                     req.actionType,
                     req.inputContext,

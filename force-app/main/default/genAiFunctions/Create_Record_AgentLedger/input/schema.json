@@ -1,0 +1,61 @@
+{
+  "required": [
+    "agentId",
+    "fieldValues",
+    "objectApiName",
+    "reasoning"
+  ],
+  "unevaluatedProperties": false,
+  "properties": {
+    "objectApiName": {
+      "title": "Object",
+      "description": "API name of the object, for example Task or Case.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "fieldValues": {
+      "title": "Field Values",
+      "description": "The fields to set, as a JSON object of field API names and values, for example {\"Subject\": \"Call the customer\"}.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "reasoning": {
+      "title": "Reasoning",
+      "description": "Why you are creating this record, in plain language.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "agentId": {
+      "title": "Agent Id",
+      "description": "Your agent identifier. Use the same value in every AgentLedger action.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "relatedRecordId": {
+      "title": "Related Record Id",
+      "description": "Optional. The record this work is about, so the log appears on its page.",
+      "lightning:type": "lightning__recordIdType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "summary": {
+      "title": "Summary",
+      "description": "Optional one-line headline for the log.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "sessionId": {
+      "title": "Session Id",
+      "description": "Optional. Leave blank: your open AgentLedger run is used, or a new one is started.",
+      "lightning:type": "lightning__recordIdType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    }
+  },
+  "lightning:type": "lightning__objectType"
+}

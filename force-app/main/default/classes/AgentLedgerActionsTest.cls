@@ -190,6 +190,7 @@ private class AgentLedgerActionsTest {
 
     @isTest
     static void testRecordMissingSessionId() {
+        // Without a Session Id, the agent's open run is used or a new one is started.
         RecordAgentActionAction.Request req = new RecordAgentActionAction.Request();
         req.sessionId = null;
         req.agentId = 'agent-1';
@@ -198,9 +199,12 @@ private class AgentLedgerActionsTest {
 
         List<RecordAgentActionAction.Result> results =
             RecordAgentActionAction.execute(
-                new List<RecordAgentActionAction.Request>{ req });
+                new List<RecordAgentActionAction.Request>{ req, req });
 
-        System.assertEquals(false, results[0].success);
+        System.assert(results[0].success, results[0].errorMessage);
+        System.assert(results[1].success, results[1].errorMessage);
+        System.assertEquals(1, [SELECT COUNT() FROM Agent_Audit_Session__c], 'both steps go into one run');
+        System.assertEquals(1, results[1].sequenceNumber);
     }
 
     @isTest

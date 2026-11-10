@@ -1,0 +1,45 @@
+{
+  "required": [
+    "agentId",
+    "recordId"
+  ],
+  "unevaluatedProperties": false,
+  "properties": {
+    "recordId": {
+      "title": "Record Id",
+      "description": "Id of the record to read.",
+      "lightning:type": "lightning__recordIdType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "fields": {
+      "title": "Fields",
+      "description": "Optional. Field API names to read, comma-separated, for example \"Status, Priority, Subject\". Leave blank for all fields.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "agentId": {
+      "title": "Agent Id",
+      "description": "Your agent identifier. Use the same value in every AgentLedger action.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "reasoning": {
+      "title": "Reasoning",
+      "description": "Optional. Why you are looking at this record.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "sessionId": {
+      "title": "Session Id",
+      "description": "Optional. Leave blank: your open AgentLedger run is used, or a new one is started.",
+      "lightning:type": "lightning__recordIdType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    }
+  },
+  "lightning:type": "lightning__objectType"
+}

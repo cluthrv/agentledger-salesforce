@@ -7,6 +7,22 @@
 
     <!-- ── Apex Class Access ── -->
     <classAccesses>
+        <apexClass>GetRecordAgentLedgerAction</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>UpdateRecordAgentLedgerAction</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>CreateRecordAgentLedgerAction</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentLedgerAutoClose</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
         <apexClass>AgentAuditRecorder</apexClass>
         <enabled>true</enabled>
     </classAccesses>
@@ -60,6 +76,11 @@
     </objectPermissions>
 
     <!-- ── Agent_Audit_Session__c Fields ── -->
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Agent_Audit_Session__c.Last_Activity__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
         <field>Agent_Audit_Session__c.Integrity__c</field>

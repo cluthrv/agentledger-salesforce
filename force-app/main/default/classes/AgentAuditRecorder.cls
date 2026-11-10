@@ -63,6 +63,7 @@ public with sharing class AgentAuditRecorder {
             Status__c = STATUS_ACTIVE,
             Integrity__c = 'Not_Checked',
             Start_Time__c = DateTime.now(),
+            Last_Activity__c = DateTime.now(),
             Related_Record_Id__c = relatedId,
             Related_Object__c = relatedId == null ? null : Id.valueOf(relatedId).getSObjectType().getDescribe().getName(),
             Started_By__c = UserInfo.getUserId(),
@@ -163,6 +164,7 @@ public with sharing class AgentAuditRecorder {
         try {
             insert record;
             session.Record_Count__c = sequenceNumber + 1;
+            session.Last_Activity__c = now;
             update session;
         } finally {
             AgentLedgerGuard.endLedgerWrite();

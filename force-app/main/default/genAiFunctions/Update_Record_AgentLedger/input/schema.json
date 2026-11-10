@@ -1,0 +1,54 @@
+{
+  "required": [
+    "agentId",
+    "fieldValues",
+    "reasoning",
+    "recordId"
+  ],
+  "unevaluatedProperties": false,
+  "properties": {
+    "recordId": {
+      "title": "Record Id",
+      "description": "Id of the record to update.",
+      "lightning:type": "lightning__recordIdType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "fieldValues": {
+      "title": "Field Values",
+      "description": "The fields to set, as a JSON object of field API names and values, for example {\"Status\": \"Escalated\"}.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "reasoning": {
+      "title": "Reasoning",
+      "description": "Why you are making this change, in plain language. The record owner will read this.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "agentId": {
+      "title": "Agent Id",
+      "description": "Your agent identifier. Use the same value in every AgentLedger action.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "summary": {
+      "title": "Summary",
+      "description": "Optional one-line headline for the log. Leave blank to generate it from the change.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "sessionId": {
+      "title": "Session Id",
+      "description": "Optional. Leave blank: your open AgentLedger run is used, or a new one is started.",
+      "lightning:type": "lightning__recordIdType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    }
+  },
+  "lightning:type": "lightning__objectType"
+}

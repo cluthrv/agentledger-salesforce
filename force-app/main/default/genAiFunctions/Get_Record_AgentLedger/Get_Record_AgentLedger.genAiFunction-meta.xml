@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiFunction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Reads fields of any Salesforce record and logs the lookup in the AgentLedger activity log. Use this instead of Get Record Details.</description>
+    <developerName>Get_Record_AgentLedger</developerName>
+    <invocationTarget>GetRecordAgentLedgerAction</invocationTarget>
+    <invocationTargetType>apex</invocationTargetType>
+    <isConfirmationRequired>false</isConfirmationRequired>
+    <isIncludeInProgressIndicator>true</isIncludeInProgressIndicator>
+    <localDeveloperName>Get_Record_AgentLedger</localDeveloperName>
+    <masterLabel>Get Record (AgentLedger)</masterLabel>
+    <progressIndicatorMessage>Reading the record...</progressIndicatorMessage>
+</GenAiFunction>

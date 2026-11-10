@@ -32,7 +32,8 @@ public with sharing class AgentLedgerGuard {
         Agent_Audit_Session__c.Related_Record_Id__c,
         Agent_Audit_Session__c.Start_Time__c,
         Agent_Audit_Session__c.End_Time__c,
-        Agent_Audit_Session__c.Started_By__c
+        Agent_Audit_Session__c.Started_By__c,
+        Agent_Audit_Session__c.Last_Activity__c
     };
 
     private static Integer ledgerWriteDepth = 0;

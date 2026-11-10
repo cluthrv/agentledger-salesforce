@@ -95,11 +95,11 @@ private class AgentLedgerSettingsTest {
         System.assertEquals(0, [SELECT COUNT() FROM Agent_Audit_Session__c]);
         System.assertEquals(0, [SELECT COUNT() FROM Agent_Audit_Record__c]);
 
-        // A missing Session Id is still an error for an agent that records.
+        // For an agent that records, a missing Session Id opens a run.
         rec.agentId = 'recording-agent';
-        RecordAgentActionAction.Result missing = RecordAgentActionAction.execute(new List<RecordAgentActionAction.Request>{ rec })[0];
-        System.assert(!missing.success);
-        System.assert(missing.errorMessage.contains('Session Id is required'));
+        RecordAgentActionAction.Result opened = RecordAgentActionAction.execute(new List<RecordAgentActionAction.Request>{ rec })[0];
+        System.assert(opened.success, opened.errorMessage);
+        System.assertEquals(1, [SELECT COUNT() FROM Agent_Audit_Session__c WHERE Agent_Id__c = 'recording-agent']);
     }
 
     @isTest

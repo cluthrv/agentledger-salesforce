@@ -148,6 +148,14 @@ public with sharing class MerkleTreeService {
      * @return The computed Merkle root hash
      */
     public static String sealSession(Id sessionId) {
+        return sealSession(sessionId, AgentAuditRecorder.STATUS_CLOSED);
+    }
+
+    /**
+     * Seal an active run and give it a final status: Closed, or Incomplete
+     * when it is closed automatically after inactivity.
+     */
+    public static String sealSession(Id sessionId, String finalStatus) {
         // Lock the run so a concurrent record or seal cannot interleave.
         Agent_Audit_Session__c current = [
             SELECT Id, Status__c, Hash_Version__c
@@ -184,7 +192,7 @@ public with sharing class MerkleTreeService {
         Agent_Audit_Session__c session = new Agent_Audit_Session__c(
             Id = sessionId,
             Merkle_Root__c = merkleRoot,
-            Status__c = AgentAuditRecorder.STATUS_CLOSED,
+            Status__c = finalStatus,
             End_Time__c = DateTime.now(),
             Record_Count__c = records.size()
         );
