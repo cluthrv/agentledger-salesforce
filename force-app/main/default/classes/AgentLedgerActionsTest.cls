@@ -277,7 +277,8 @@ private class AgentLedgerActionsTest {
             SealAgentLedgerSessionAction.execute(
                 new List<SealAgentLedgerSessionAction.Request>{ seal });
 
-        System.assertEquals(false, results[0].success);
+        System.assertEquals(true, results[0].success, 'no run to close is not an error');
+        System.assertEquals(null, results[0].merkleRoot);
     }
 
     // ════════════════════════════════════════════════════════════

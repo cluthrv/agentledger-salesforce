@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>Org Default</label>
+    <protected>false</protected>
+    <values>
+        <field>Enabled__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
+        <field>Mode__c</field>
+        <value xsi:type="xsd:string">Activity_Log</value>
+    </values>
+    <values>
+        <field>Auto_Close_Minutes__c</field>
+        <value xsi:type="xsd:double">30</value>
+    </values>
+    <values>
+        <field>Store_Field_Values__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
+        <field>Anchor_Provider__c</field>
+        <value xsi:type="xsd:string">None</value>
+    </values>
+</CustomMetadata>

@@ -68,7 +68,8 @@ public with sharing class AgentAuditRecorder {
             Started_By__c = UserInfo.getUserId(),
             Platform__c = platform,
             Record_Count__c = 0,
-            Hash_Version__c = HashChainService.HASH_V2
+            Hash_Version__c = HashChainService.HASH_V2,
+            Mode__c = AgentLedgerSettings.forAgent(agentId).mode
         );
         insert session;
         return session.Id;

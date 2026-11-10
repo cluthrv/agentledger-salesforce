@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Never_Store_Fields__c</fullName>
+    <description>Fields whose values are never stored, one per line or comma-separated, as Object.Field (for example Contact.Birthdate). Org_Default only.</description>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Never Store Fields</label>
+    <length>32768</length>
+    <type>LongTextArea</type>
+    <visibleLines>4</visibleLines>
+</CustomField>

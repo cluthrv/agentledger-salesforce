@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Enabled__c</fullName>
+    <description>When off, AgentLedger actions succeed without recording anything for this agent (or the whole org on Org_Default).</description>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Enabled</label>
+    <defaultValue>true</defaultValue>
+    <type>Checkbox</type>
+</CustomField>

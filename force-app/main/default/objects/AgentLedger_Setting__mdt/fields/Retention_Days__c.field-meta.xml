@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Retention_Days__c</fullName>
+    <description>Delete closed runs older than this. Blank means keep forever. Org_Default only.</description>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Retention (days)</label>
+    <precision>6</precision>
+    <required>false</required>
+    <scale>0</scale>
+    <type>Number</type>
+    <unique>false</unique>
+</CustomField>

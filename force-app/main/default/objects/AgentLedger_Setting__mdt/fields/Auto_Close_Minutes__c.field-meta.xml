@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Auto_Close_Minutes__c</fullName>
+    <description>Open runs with no activity for this long are closed and marked Incomplete. Org_Default only. Blank means 30.</description>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Auto-Close After (minutes)</label>
+    <precision>5</precision>
+    <required>false</required>
+    <scale>0</scale>
+    <type>Number</type>
+    <unique>false</unique>
+</CustomField>

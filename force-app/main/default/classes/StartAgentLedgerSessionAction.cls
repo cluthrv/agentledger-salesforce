@@ -55,6 +55,15 @@ public with sharing class StartAgentLedgerSessionAction {
                     continue;
                 }
 
+                // Turned off for this agent: succeed without recording, so the
+                // agent carries on normally. Later actions get no Session Id
+                // and do nothing.
+                if (!AgentLedgerSettings.forAgent(req.agentId).enabled) {
+                    res.success = true;
+                    results.add(res);
+                    continue;
+                }
+
                 Id sessionId = AgentAuditRecorder.startSession(
                     req.agentId,
                     req.relatedRecordId,

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Anchor_Provider__c</fullName>
+    <description>Where closed runs are anchored in Tamper-Evident + Anchored mode: an RFC 3161 timestamp authority or a custom endpoint. Org_Default only.</description>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Anchor Provider</label>
+    <required>false</required>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>None</fullName>
+                <default>false</default>
+                <label>None</label>
+            </value>
+            <value>
+                <fullName>RFC3161</fullName>
+                <default>false</default>
+                <label>RFC 3161 Timestamp Authority</label>
+            </value>
+            <value>
+                <fullName>Custom</fullName>
+                <default>false</default>
+                <label>Custom Endpoint</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

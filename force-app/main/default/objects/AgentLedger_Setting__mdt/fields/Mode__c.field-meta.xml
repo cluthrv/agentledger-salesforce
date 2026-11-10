@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Mode__c</fullName>
+    <description>Activity Log, Tamper-Evident, or Tamper-Evident + Anchored. Blank on an agent record means: use Org_Default.</description>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Mode</label>
+    <required>false</required>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Activity_Log</fullName>
+                <default>false</default>
+                <label>Activity Log</label>
+            </value>
+            <value>
+                <fullName>Tamper_Evident</fullName>
+                <default>false</default>
+                <label>Tamper-Evident</label>
+            </value>
+            <value>
+                <fullName>Anchored</fullName>
+                <default>false</default>
+                <label>Tamper-Evident + Anchored</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

@@ -65,6 +65,13 @@ public with sharing class RecordAgentActionAction {
         for (Request req : requests) {
             Result res = new Result();
             try {
+                if (req.sessionId == null && String.isNotBlank(req.agentId)
+                    && !AgentLedgerSettings.forAgent(req.agentId).enabled) {
+                    // AgentLedger is turned off for this agent: nothing to record.
+                    res.success = true;
+                    results.add(res);
+                    continue;
+                }
                 if (req.sessionId == null) {
                     res.success = false;
                     res.errorMessage = 'Session Id is required.';

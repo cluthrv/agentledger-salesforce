@@ -38,8 +38,11 @@ public with sharing class SealAgentLedgerSessionAction {
             Result res = new Result();
             try {
                 if (req.sessionId == null) {
-                    res.success = false;
-                    res.errorMessage = 'Session Id is required.';
+                    // No run to close: AgentLedger is turned off for this agent,
+                    // or no run was started. Succeed so the agent can finish; a
+                    // run that was started but not closed is closed later and
+                    // marked Incomplete.
+                    res.success = true;
                     results.add(res);
                     continue;
                 }

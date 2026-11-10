@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Store_Field_Values__c</fullName>
+    <description>Store before and after values of changed fields. When off, only field names are stored. Org_Default only.</description>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Store Field Values</label>
+    <defaultValue>true</defaultValue>
+    <type>Checkbox</type>
+</CustomField>

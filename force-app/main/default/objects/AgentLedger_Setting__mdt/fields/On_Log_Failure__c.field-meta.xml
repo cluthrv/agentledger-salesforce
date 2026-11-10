@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>On_Log_Failure__c</fullName>
+    <description>What a recorded action does when its log entry cannot be written: Continue (keep the change) or Roll Back (undo it). Blank means Continue in Activity Log mode and Roll Back otherwise.</description>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>If Logging Fails</label>
+    <required>false</required>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Continue</fullName>
+                <default>false</default>
+                <label>Continue</label>
+            </value>
+            <value>
+                <fullName>Roll_Back</fullName>
+                <default>false</default>
+                <label>Roll Back</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>
