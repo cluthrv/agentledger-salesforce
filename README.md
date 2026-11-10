@@ -403,4 +403,4 @@ See [GUIDE.md](GUIDE.md) for:
 
 ## License
 
-See [LICENSE](../LICENSE).
+See [LICENSE](LICENSE).
