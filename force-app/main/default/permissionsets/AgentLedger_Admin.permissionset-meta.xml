@@ -188,4 +188,12 @@
         <field>Agent_Audit_Record__c.Reasoning__c</field>
         <readable>true</readable>
     </fieldPermissions>
+    <tabSettings>
+        <tab>Agent_Audit_Session__c</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>Agent_Audit_Record__c</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
 </PermissionSet>
