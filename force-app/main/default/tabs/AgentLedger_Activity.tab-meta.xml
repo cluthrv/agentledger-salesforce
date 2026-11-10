@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomTab xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Recent AgentLedger runs across the org.</description>
+    <label>Agent Activity</label>
+    <lwcComponent>agentLedgerActivity</lwcComponent>
+    <motif>Custom55: Diamond</motif>
+</CustomTab>

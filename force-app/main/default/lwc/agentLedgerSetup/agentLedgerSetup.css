@@ -1,0 +1,27 @@
+.setup {
+    max-width: 72rem;
+}
+.tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 0.75rem;
+}
+.tile {
+    border: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
+    border-radius: 0.25rem;
+    padding: 0.75rem;
+    text-align: center;
+}
+.tile .n {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+.row {
+    display: flex;
+    align-items: flex-end;
+}
+.form {
+    display: grid;
+    gap: 0.5rem;
+    max-width: 40rem;
+}

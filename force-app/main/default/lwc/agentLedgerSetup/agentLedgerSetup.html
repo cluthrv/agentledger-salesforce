@@ -1,0 +1,149 @@
+<template>
+    <div class="slds-p-around_medium setup">
+        <template lwc:if={error}>
+            <div class="slds-notify slds-notify_alert slds-alert_error">{error}</div>
+        </template>
+        <template lwc:if={isLoading}>
+            <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+        </template>
+
+        <template lwc:if={data}>
+            <template lwc:if={readOnly}>
+                <div class="slds-notify slds-notify_alert slds-alert_warning slds-m-bottom_medium">
+                    You can view these settings. Changing them needs the Customize Application permission.
+                </div>
+            </template>
+
+            <!-- Health -->
+            <lightning-card title="Health" icon-name="utility:heart">
+                <div class="slds-p-horizontal_medium">
+                    <div class="tiles">
+                        <div class="tile"><div class="n">{health.totalRuns}</div><div>runs</div></div>
+                        <div class="tile"><div class="n">{health.activeRuns}</div><div>open now</div></div>
+                        <div class="tile"><div class="n">{health.incompleteRuns}</div><div>incomplete (auto-closed)</div></div>
+                        <div class="tile"><div class="n">{health.tamperedRuns}</div><div>failed verification</div></div>
+                        <div class="tile"><div class="n">{health.snapshots}</div><div>instruction versions kept</div></div>
+                    </div>
+
+                    <div class="row slds-m-top_medium">
+                        <lightning-input type="toggle" label="Auto-close inactive runs" checked={health.autoCloseScheduled}
+                            onchange={handleAutoCloseToggle} disabled={readOnly} message-toggle-active="On (hourly)"
+                            message-toggle-inactive="Off"></lightning-input>
+                        <lightning-button label="Run now" onclick={handleRunNow} disabled={readOnly}
+                            class="slds-m-left_small"></lightning-button>
+                    </div>
+                    <p class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
+                        Turn auto-close off before upgrading AgentLedger and on again afterwards: Salesforce does not
+                        deploy Apex while a scheduled job is pending.
+                    </p>
+
+                    <h3 class="slds-text-title_caps slds-m-top_medium slds-m-bottom_x-small">Permission sets</h3>
+                    <table class="slds-table slds-table_bordered slds-table_cell-buffer">
+                        <thead><tr><th>Permission set</th><th>Users</th><th>For</th></tr></thead>
+                        <tbody>
+                            <template for:each={permissionRows} for:item="p">
+                                <tr key={p.name}>
+                                    <td>{p.label}</td>
+                                    <td>
+                                        {p.users}
+                                        <template lwc:if={p.warn}>
+                                            <lightning-icon icon-name="utility:warning" size="xx-small" variant="warning"
+                                                alternative-text="Remove before production" class="slds-m-left_x-small"></lightning-icon>
+                                        </template>
+                                    </td>
+                                    <td class="slds-text-color_weak">{p.note}</td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </lightning-card>
+
+            <!-- Org defaults -->
+            <lightning-card title="Org settings" icon-name="utility:settings" class="slds-m-top_medium">
+                <div class="slds-p-horizontal_medium form">
+                    <lightning-input type="toggle" label="AgentLedger enabled" data-field="enabled"
+                        checked={org.enabled} onchange={handleOrgChange} disabled={readOnly}></lightning-input>
+                    <lightning-combobox label="Default mode" data-field="mode" value={org.mode} options={modeOptions}
+                        onchange={handleOrgChange} disabled={readOnly}
+                        field-level-help="Activity Log: a readable log. Tamper-Evident: adds verification and blocks rollbacks of unlogged changes. Each run keeps the mode it started with."></lightning-combobox>
+                    <lightning-combobox label="If a change cannot be logged" data-field="onLogFailure" value={org.onLogFailure}
+                        options={failureOptions} onchange={handleOrgChange} disabled={readOnly}
+                        field-level-help="By default the change is kept in Activity Log mode and rolled back in tamper-evident modes."></lightning-combobox>
+                    <lightning-input type="number" label="Close inactive runs after (minutes)" data-field="autoCloseMinutes"
+                        value={org.autoCloseMinutes} min="1" onchange={handleOrgChange} disabled={readOnly}></lightning-input>
+                    <lightning-input type="toggle" label="Store field values in the log" data-field="storeFieldValues"
+                        checked={org.storeFieldValues} onchange={handleOrgChange} disabled={readOnly}
+                        message-toggle-active="Before and after values" message-toggle-inactive="Field names only"></lightning-input>
+                    <lightning-textarea label="Never store values of these fields" data-field="neverStoreFields"
+                        value={org.neverStoreFields} onchange={handleOrgChange} disabled={readOnly}
+                        placeholder="Object.Field, one per line, e.g. Contact.Birthdate"></lightning-textarea>
+                    <lightning-input label="Policy reference (all agents)" data-field="policyReference" value={org.policyReference}
+                        onchange={handleOrgChange} disabled={readOnly}
+                        field-level-help="Recorded on every run, e.g. 'AI Agent Policy v2'. An agent's own setting overrides it."></lightning-input>
+                    <div class="slds-m-top_small">
+                        <lightning-button variant="brand" label="Save org settings" onclick={handleSaveOrg}
+                            disabled={readOnly}></lightning-button>
+                    </div>
+                    <p class="slds-text-body_small slds-text-color_weak slds-m-top_small">
+                        Coming next: watched objects (catch changes made outside AgentLedger), retention, and anchoring
+                        to an RFC 3161 timestamp authority.
+                    </p>
+                </div>
+            </lightning-card>
+
+            <!-- Agents -->
+            <lightning-card title="Agents" icon-name="utility:einstein" class="slds-m-top_medium">
+                <div class="slds-p-horizontal_medium">
+                    <template lwc:if={hasAgents}>
+                        <table class="slds-table slds-table_bordered slds-table_cell-buffer">
+                            <thead><tr><th>Agent</th><th>Type</th><th>Agent Id in actions</th><th>AgentLedger</th><th></th></tr></thead>
+                            <tbody>
+                                <template for:each={agentRows} for:item="a">
+                                    <tr key={a.apiName}>
+                                        <td><strong>{a.label}</strong><div class="slds-text-color_weak">{a.apiName}</div></td>
+                                        <td>{a.kind}</td>
+                                        <td>{a.agentId}</td>
+                                        <td>{a.status}</td>
+                                        <td><lightning-button label="Edit" data-api={a.apiName} onclick={handleEditAgent}></lightning-button></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </template>
+                    <template lwc:else>
+                        <p class="slds-text-color_weak">No Agentforce agents in this org yet.</p>
+                    </template>
+
+                    <template lwc:if={agentForm}>
+                        <div class="agent-form slds-box slds-m-top_medium">
+                            <h3 class="slds-text-heading_small slds-m-bottom_small">{agentForm.label}</h3>
+                            <div class="form">
+                                <lightning-input label="Agent Id in actions" data-field="agentApiName" value={agentForm.agentApiName}
+                                    onchange={handleAgentChange} disabled={readOnly} required
+                                    field-level-help="The value this agent passes as Agent Id to AgentLedger actions. Using the agent's API name is simplest."></lightning-input>
+                                <lightning-input type="toggle" label="Record this agent" data-field="enabled"
+                                    checked={agentForm.enabled} onchange={handleAgentChange} disabled={readOnly}></lightning-input>
+                                <lightning-combobox label="Mode" data-field="mode" value={agentForm.mode} options={agentModeOptions}
+                                    onchange={handleAgentChange} disabled={readOnly}></lightning-combobox>
+                                <lightning-combobox label="If a change cannot be logged" data-field="onLogFailure"
+                                    value={agentForm.onLogFailure} options={failureOptions} onchange={handleAgentChange}
+                                    disabled={readOnly}></lightning-combobox>
+                                <lightning-input label="Policy reference" data-field="policyReference" value={agentForm.policyReference}
+                                    onchange={handleAgentChange} disabled={readOnly} placeholder="e.g. Escalation Policy v3"></lightning-input>
+                                <lightning-textarea label="Policy text (optional)" data-field="policyText" value={agentForm.policyText}
+                                    onchange={handleAgentChange} disabled={readOnly}
+                                    field-level-help="Its fingerprint is recorded on every run, so a later change to the policy is visible."></lightning-textarea>
+                            </div>
+                            <div class="slds-m-top_small">
+                                <lightning-button variant="brand" label="Save agent settings" onclick={handleSaveAgent}
+                                    disabled={readOnly}></lightning-button>
+                                <lightning-button label="Close" onclick={handleCloseAgent} class="slds-m-left_small"></lightning-button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </lightning-card>
+        </template>
+    </div>
+</template>

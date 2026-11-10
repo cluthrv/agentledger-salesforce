@@ -1,100 +1,134 @@
 <template>
-    <lightning-card title="AgentLedger Audit Trail" icon-name="custom:custom55">
-        <template if:true={isLoading}>
-            <div class="loading-container">
-                <lightning-spinner alternative-text="Loading audit trail" size="small"></lightning-spinner>
-            </div>
-        </template>
+    <lightning-card title="Agent Activity" icon-name="custom:custom55">
+        <lightning-button-icon slot="actions" icon-name="utility:refresh" alternative-text="Refresh"
+            title="Refresh" onclick={handleRefresh}></lightning-button-icon>
 
-        <template if:false={isLoading}>
-            <template if:true={hasNoSessions}>
-                <div class="empty-container">
-                    <p class="empty-text">No AI agent audit sessions found for this record.</p>
-                </div>
+        <div class="slds-p-horizontal_medium">
+            <template lwc:if={loadError}>
+                <p class="slds-text-color_error">Could not load agent activity: {loadError}</p>
             </template>
 
-            <template if:true={hasSessions}>
-                <template for:each={sessions} for:item="session">
-                    <div key={session.sessionId} class="session-container">
-                        <!-- Session Header -->
-                        <div class="session-header">
-                            <div class="session-info">
-                                <div class="session-title">
-                                    <span class="agent-name">{session.agentId}</span>
-                                    <span class={session.statusClass}>{session.status}</span>
-                                    <template if:true={session.hasIntegrity}>
-                                        <span class={session.integrityClass} title="Result of the latest verification">{session.integrityLabel}</span>
+            <template lwc:if={isEmpty}>
+                <p class="slds-text-color_weak slds-p-vertical_small">No agent activity on this record yet.</p>
+            </template>
+
+            <template for:each={runs} for:item="run">
+                <section key={run.runId} class="run">
+                    <div class="run-header">
+                        <div>
+                            <div class="run-title">
+                                <span class="agent">{run.agent}</span>
+                                <span class={run.statusClass}>{run.status}</span>
+                                <template lwc:if={run.showIntegrity}>
+                                    <span class={run.integrityClass}>{run.integrityLabel}</span>
+                                </template>
+                            </div>
+                            <div class="slds-text-body_small slds-text-color_weak">
+                                <a href={run.runUrl}>{run.name}</a>
+                                <template lwc:if={run.startedBy}><span> · started by {run.startedBy}</span></template>
+                                <span> · </span>
+                                <lightning-formatted-date-time value={run.startTime} year="numeric" month="short"
+                                    day="numeric" hour="2-digit" minute="2-digit"></lightning-formatted-date-time>
+                                <span> · {run.stepsLabel} · {run.modeLabel}</span>
+                                <template lwc:if={run.hasVerifiedTime}>
+                                    <span> · checked </span>
+                                    <lightning-formatted-date-time value={run.lastVerifiedAt} month="short" day="numeric"
+                                        hour="2-digit" minute="2-digit"></lightning-formatted-date-time>
+                                </template>
+                            </div>
+                            <template lwc:if={run.hasActedUnder}>
+                                <div class="slds-text-body_small slds-m-top_xx-small acted-under">
+                                    <span>Acted under </span>
+                                    <template lwc:if={run.agentVersion}><strong>{run.agentVersion}</strong></template>
+                                    <template lwc:if={run.policyReference}><span> · policy </span><strong>{run.policyReference}</strong></template>
+                                    <template lwc:if={run.snapshotUrl}><span> · </span><a href={run.snapshotUrl}>view instructions</a></template>
+                                </div>
+                            </template>
+                            <template lwc:if={run.otherRecord}>
+                                <div class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
+                                    This run was about another record; it also touched this one.
+                                </div>
+                            </template>
+                        </div>
+                        <template lwc:if={run.showVerify}>
+                            <lightning-button label="Verify" icon-name="utility:shield" data-run-id={run.runId}
+                                onclick={handleVerify} disabled={run.isVerifying}></lightning-button>
+                        </template>
+                    </div>
+
+                    <ol class="entries">
+                        <template for:each={run.entries} for:item="entry">
+                            <li key={entry.entryId} class="entry">
+                                <lightning-icon icon-name={entry.icon} size="x-small" class="entry-icon"
+                                    alternative-text={entry.typeLabel}></lightning-icon>
+                                <div class="entry-body">
+                                    <div class="entry-line">
+                                        <span class="entry-type">{entry.typeLabel}</span>
+                                        <span class="entry-summary">{entry.summaryText}</span>
+                                    </div>
+                                    <div class="slds-text-body_small slds-text-color_weak">
+                                        <span class={entry.captureClass}>{entry.captureLabel}</span>
+                                        <span> · </span>
+                                        <lightning-formatted-date-time value={entry.timestamp} hour="2-digit"
+                                            minute="2-digit" second="2-digit"></lightning-formatted-date-time>
+                                        <template lwc:if={entry.elsewhere}>
+                                            <span> · on </span><a href={entry.elsewhereUrl}>{entry.targetObject}</a>
+                                        </template>
+                                        <span> · </span>
+                                        <button class="slds-button link-button" data-entry-id={entry.entryId}
+                                            onclick={handleToggle}>{entry.toggleLabel}</button>
+                                    </div>
+
+                                    <template lwc:if={entry.hasFieldChanges}>
+                                        <table class="changes slds-table slds-table_bordered slds-table_cell-buffer">
+                                            <thead>
+                                                <tr><th>Field</th><th>Before</th><th>After</th></tr>
+                                            </thead>
+                                            <tbody>
+                                                <template for:each={entry.fieldChangeRows} for:item="c">
+                                                    <tr key={c.key}><td>{c.label}</td><td>{c.before}</td><td>{c.after}</td></tr>
+                                                </template>
+                                            </tbody>
+                                        </table>
+                                    </template>
+                                    <template lwc:if={entry.hasHidden}>
+                                        <p class="slds-text-body_small slds-text-color_weak">{entry.hiddenLabel}</p>
+                                    </template>
+
+                                    <template lwc:if={entry.isExpanded}>
+                                        <dl class="details">
+                                            <template lwc:if={entry.reasoning}>
+                                                <dt>Why</dt><dd>{entry.reasoning}</dd>
+                                            </template>
+                                            <template lwc:if={entry.inputContext}>
+                                                <dt>Looked at</dt><dd class="pre">{entry.inputContext}</dd>
+                                            </template>
+                                            <template lwc:if={entry.outputResult}>
+                                                <dt>Result</dt><dd class="pre">{entry.outputResult}</dd>
+                                            </template>
+                                            <template lwc:if={entry.policyReference}>
+                                                <dt>Policy</dt><dd>{entry.policyReference}</dd>
+                                            </template>
+                                            <template lwc:if={entry.hash}>
+                                                <dt>Hash</dt><dd class="hash">{entry.hash}</dd>
+                                            </template>
+                                        </dl>
                                     </template>
                                 </div>
-                                <div class="session-meta">
-                                    {session.sessionName} &bull; {session.recordCount} actions &bull; {session.startTimeFormatted}
-                                </div>
-                            </div>
-                            <template if:true={session.isSealed}>
-                                <lightning-button
-                                    variant="brand-outline"
-                                    label="Verify"
-                                    onclick={handleVerify}
-                                    data-session-id={session.sessionId}
-                                    icon-name="utility:check"
-                                    class="verify-btn">
-                                </lightning-button>
-                            </template>
-                        </div>
-
-                        <!-- Verification Fingerprint (Merkle Root) -->
-                        <template if:true={session.merkleRoot}>
-                            <div class="merkle-section">
-                                <span class="merkle-label">
-                                    Verification Fingerprint
-                                    <lightning-helptext
-                                        content="Cryptographic Merkle root that fingerprints the entire session. Click Verify to confirm the audit trail is unaltered."
-                                        class="merkle-help">
-                                    </lightning-helptext>
-                                </span>
-                                <span class="merkle-value">{session.merkleRoot}</span>
-                            </div>
+                            </li>
                         </template>
-
-                        <!-- Verification Result -->
-                        <template if:true={session.verifyResult}>
-                            <div class={session.verifyClass}>
-                                <lightning-icon
-                                    icon-name={session.verifyIcon}
-                                    size="xx-small"
-                                    variant={session.verifyVariant}
-                                    class="verify-result-icon">
-                                </lightning-icon>
-                                <span>{session.verifyMessage}</span>
-                            </div>
-                        </template>
-
-                        <!-- Audit Records -->
-                        <div class="records-list">
-                            <template for:each={session.records} for:item="rec">
-                                <div key={rec.sequenceNumber} class="record-row">
-                                    <div class="record-left">
-                                        <span class={rec.typeBadge}>{rec.actionType}</span>
-                                        <span class="record-seq">#{rec.sequenceNumber}</span>
-                                    </div>
-                                    <div class="record-center">
-                                        <div class="record-reasoning">{rec.reasoning}</div>
-                                        <div class="record-hash">
-                                            <span class="hash-text">{rec.shortHash}</span>
-                                            <template if:true={rec.previousHash}>
-                                                <span class="chain-indicator">
-                                                    <lightning-icon icon-name="utility:link" size="xx-small" class="chain-link-icon"></lightning-icon>
-                                                    #{rec.prevIndex}
-                                                </span>
-                                            </template>
-                                        </div>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                </template>
+                    </ol>
+                </section>
             </template>
-        </template>
+
+            <template lwc:if={hasMore}>
+                <div class="slds-align_absolute-center slds-p-vertical_small">
+                    <lightning-button label="Show older runs" onclick={handleShowOlder} disabled={isLoading}></lightning-button>
+                </div>
+            </template>
+            <template lwc:if={isLoading}>
+                <div class="spinner-holder"><lightning-spinner size="small" alternative-text="Loading"></lightning-spinner></div>
+            </template>
+        </div>
     </lightning-card>
 </template>

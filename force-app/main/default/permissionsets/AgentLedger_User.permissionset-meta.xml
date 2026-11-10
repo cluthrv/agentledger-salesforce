@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <applicationVisibilities>
+        <application>AgentLedger</application>
+        <visible>true</visible>
+    </applicationVisibilities>
+    <classAccesses>
+        <apexClass>AgentLedgerActivityController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentLedgerTimelineController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
     <classAccesses>
         <apexClass>CreateRecordAgentLedgerAction</apexClass>
         <enabled>true</enabled>
@@ -254,6 +266,10 @@
         <object>Agent_Instructions_Snapshot__c</object>
         <viewAllRecords>false</viewAllRecords>
     </objectPermissions>
+    <tabSettings>
+        <tab>AgentLedger_Activity</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
     <description>For people who work on records and use employee agents: read the activity log of records they can see, verify runs, and run the AgentLedger agent actions.</description>
     <hasActivationRequired>false</hasActivationRequired>
     <label>AgentLedger User</label>

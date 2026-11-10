@@ -39,6 +39,11 @@ const x = {
   obj: (o, { edit = false, viewAll = false } = {}) => `    <objectPermissions>\n        <allowCreate>false</allowCreate>\n        <allowDelete>false</allowDelete>\n` +
     `        <allowEdit>${edit}</allowEdit>\n        <allowRead>true</allowRead>\n        <modifyAllRecords>false</modifyAllRecords>\n` +
     `        <object>${o}</object>\n        <viewAllRecords>${viewAll}</viewAllRecords>\n    </objectPermissions>\n`,
+  app: (a) => `    <applicationVisibilities>
+        <application>${a}</application>
+        <visible>true</visible>
+    </applicationVisibilities>
+`,
   tab: (t) => `    <tabSettings>\n        <tab>${t}</tab>\n        <visibility>Visible</visibility>\n    </tabSettings>\n`,
 };
 function permissionSet(name, label, description, body) {
@@ -51,13 +56,15 @@ const allFields = OBJECTS.flatMap(fieldsOf);
 
 permissionSet('AgentLedger_Admin', 'AgentLedger Admin',
   'Sees every AgentLedger run, entry and instructions snapshot (read-only; the ledger is append-only), runs all AgentLedger classes, and has the AgentLedger tabs.',
-  classes.map(x.cls).join('') + allFields.map((f) => x.fld(f, false)).join('') +
-  OBJECTS.map((o) => x.obj(o, { viewAll: true })).join('') + x.tab('Agent_Audit_Session__c') + x.tab('Agent_Audit_Record__c'));
+  x.app('AgentLedger') + classes.map(x.cls).join('') + allFields.map((f) => x.fld(f, false)).join('') +
+  OBJECTS.map((o) => x.obj(o, { viewAll: true })).join('') +
+  ['AgentLedger_Activity', 'AgentLedger_Setup', 'Agent_Audit_Record__c', 'Agent_Audit_Session__c'].map(x.tab).join(''));
 
 permissionSet('AgentLedger_User', 'AgentLedger User',
   'For people who work on records and use employee agents: read the activity log of records they can see, verify runs, and run the AgentLedger agent actions.',
-  ['RecordAuditTrailController', ...ACTIONS].sort().map(x.cls).join('') + allFields.map((f) => x.fld(f, false)).join('') +
-  OBJECTS.map((o) => x.obj(o)).join(''));
+  x.app('AgentLedger') +
+  ['RecordAuditTrailController', 'AgentLedgerTimelineController', 'AgentLedgerActivityController', ...ACTIONS].sort().map(x.cls).join('') +
+  allFields.map((f) => x.fld(f, false)).join('') + OBJECTS.map((o) => x.obj(o)).join('') + x.tab('AgentLedger_Activity'));
 
 permissionSet('AgentLedger_Agent', 'AgentLedger Agent',
   'For the user a service agent runs as: the AgentLedger agent actions. The ledger is written by AgentLedger itself, so no object access is needed.',

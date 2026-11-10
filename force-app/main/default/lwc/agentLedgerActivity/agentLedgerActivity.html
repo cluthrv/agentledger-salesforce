@@ -1,0 +1,22 @@
+<template>
+    <lightning-card title="Agent Activity" icon-name="custom:custom55">
+        <lightning-button-icon slot="actions" icon-name="utility:refresh" alternative-text="Refresh"
+            onclick={handleRefresh}></lightning-button-icon>
+        <div class="slds-p-horizontal_medium">
+            <div class="filters">
+                <lightning-combobox label="Status" value={status} options={statusOptions} onchange={handleStatus}></lightning-combobox>
+                <lightning-combobox label="Integrity" value={integrity} options={integrityOptions} onchange={handleIntegrity}></lightning-combobox>
+                <lightning-input label="Agent" value={agent} placeholder="Type and press Enter" onchange={handleAgent}
+                    onkeyup={handleAgentKey}></lightning-input>
+            </div>
+            <template lwc:if={error}>
+                <p class="slds-text-color_error slds-m-top_small">{error}</p>
+            </template>
+            <p class="slds-text-body_small slds-text-color_weak slds-m-vertical_small">{count} runs, newest first</p>
+        </div>
+        <div class="table">
+            <lightning-datatable key-field="runId" data={rows} columns={columns} hide-checkbox-column
+                is-loading={isLoading}></lightning-datatable>
+        </div>
+    </lightning-card>
+</template>

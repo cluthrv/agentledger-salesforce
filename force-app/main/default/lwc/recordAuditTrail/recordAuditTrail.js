@@ -1,99 +1,165 @@
-import { LightningElement, api, wire, track } from 'lwc';
-import getSessionsForRecord from '@salesforce/apex/RecordAuditTrailController.getSessionsForRecord';
-import verifySessionFromRecord from '@salesforce/apex/RecordAuditTrailController.verifySessionFromRecord';
+import { LightningElement, api } from 'lwc';
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import getTimeline from '@salesforce/apex/AgentLedgerTimelineController.getTimeline';
+import verifyRun from '@salesforce/apex/AgentLedgerTimelineController.verifyRun';
 
-const TYPE_BADGE_MAP = {
-    'Query': 'type-badge type-query',
-    'Validation': 'type-badge type-validation',
-    'Decision': 'type-badge type-decision',
-    'Calculation': 'type-badge type-calculation',
-    'Create': 'type-badge type-create',
-    'Update': 'type-badge type-update',
-    'Tool_Call': 'type-badge type-query',
-    'Escalation': 'type-badge type-decision',
-    'Delete': 'type-badge type-decision'
+const PAGE_SIZE = 10;
+
+const TYPE_ICONS = {
+    Recommendation: 'utility:like',
+    Decision: 'utility:approval',
+    Human_Response: 'utility:user',
+    Query: 'utility:search',
+    Validation: 'utility:check',
+    Calculation: 'utility:formula',
+    Data_Change: 'utility:edit',
+    Update: 'utility:edit',
+    Create: 'utility:add',
+    Delete: 'utility:delete',
+    Escalation: 'utility:priority',
+    Tool_Call: 'utility:settings',
+    Error: 'utility:warning'
 };
 
-// The latest verification result and when it ran. A result is never shown
-// without its time, so an old result cannot pass for a current one.
-function integrityView(integrity, lastVerifiedAt) {
-    const checked = integrity === 'Verified' || integrity === 'Tampered';
-    return {
-        hasIntegrity: checked,
-        integrityLabel: checked
-            ? integrity + ' ' + (lastVerifiedAt ? new Date(lastVerifiedAt).toLocaleString() : '')
-            : '',
-        integrityClass: integrity === 'Verified' ? 'status-pill status-verified' : 'status-pill status-tampered'
-    };
-}
+const STATUS_VARIANT = { Active: 'slds-theme_info', Closed: '', Incomplete: 'slds-theme_warning' };
 
+/**
+ * AgentLedger activity timeline: what agents did on this record, in plain
+ * language, newest run first. Verification appears only for runs recorded in a
+ * tamper-evident mode.
+ */
 export default class RecordAuditTrail extends LightningElement {
     @api recordId;
-    @track sessions = [];
-    isLoading = true;
 
-    @wire(getSessionsForRecord, { recordId: '$recordId' })
-    wiredSessions({ error, data }) {
-        this.isLoading = false;
-        if (data) {
-            this.sessions = data.map(session => ({
-                ...session,
-                ...integrityView(session.integrity, session.lastVerifiedAt),
-                isSealed: session.closed,
-                status: session.lifecycle,
-                statusClass: session.closed ? 'status-pill status-sealed' : 'status-pill status-active',
-                startTimeFormatted: session.startTime ? new Date(session.startTime).toLocaleString() : '',
-                verifyResult: null,
-                verifyClass: '',
-                verifyIcon: '',
-                verifyVariant: '',
-                verifyMessage: '',
-                records: session.records.map(rec => ({
-                    ...rec,
-                    shortHash: rec.recordHash ? rec.recordHash.substring(0, 16) + '...' : '',
-                    prevIndex: rec.sequenceNumber - 1,
-                    typeBadge: TYPE_BADGE_MAP[rec.actionType] || 'type-badge type-query'
-                }))
-            }));
-        } else if (error) {
-            console.error('Error loading audit trail:', error);
-            this.sessions = [];
+    runs = [];
+    hasMore = false;
+    isLoading = true;
+    loadError;
+    expanded = new Set();
+    verifying = new Set();
+    rawRuns = [];
+
+    connectedCallback() {
+        this.load();
+    }
+
+    get isEmpty() {
+        return !this.isLoading && !this.loadError && this.runs.length === 0;
+    }
+
+    async load(append = false) {
+        this.isLoading = true;
+        this.loadError = undefined;
+        try {
+            const before = append && this.rawRuns.length
+                ? this.rawRuns[this.rawRuns.length - 1].startTime
+                : null;
+            const result = await getTimeline({ recordId: this.recordId, pageSize: PAGE_SIZE, startedBefore: before });
+            this.rawRuns = append ? [...this.rawRuns, ...result.runs] : result.runs;
+            this.hasMore = result.hasMore;
+            this.buildView();
+        } catch (error) {
+            this.loadError = reduceError(error);
+        } finally {
+            this.isLoading = false;
         }
     }
 
-    get hasNoSessions() {
-        return this.sessions.length === 0;
+    handleRefresh() {
+        this.load(false);
     }
 
-    get hasSessions() {
-        return this.sessions.length > 0;
+    handleShowOlder() {
+        this.load(true);
+    }
+
+    handleToggle(event) {
+        const id = event.currentTarget.dataset.entryId;
+        if (this.expanded.has(id)) {
+            this.expanded.delete(id);
+        } else {
+            this.expanded.add(id);
+        }
+        this.buildView();
     }
 
     async handleVerify(event) {
-        const sessionId = event.target.dataset.sessionId;
+        const runId = event.currentTarget.dataset.runId;
+        this.verifying.add(runId);
+        this.buildView();
         try {
-            const result = await verifySessionFromRecord({ sessionId });
-            // The Apex verify updates the session Status to Verified or Tampered.
-            // Reflect that new status in the UI immediately, and keep the
-            // Verify button available so a fixed session can be re-verified.
-            this.sessions = this.sessions.map(s => {
-                if (s.sessionId === sessionId) {
-                    return {
-                        ...s,
-                        ...integrityView(result.valid ? 'Verified' : 'Tampered', new Date().toISOString()),
-                        verifyResult: result,
-                        verifyClass: result.valid ? 'verify-result verify-pass' : 'verify-result verify-fail',
-                        verifyIcon: result.valid ? 'utility:success' : 'utility:error',
-                        verifyVariant: result.valid ? 'success' : 'error',
-                        verifyMessage: result.valid
-                            ? 'Verified: All ' + s.recordCount + ' records have valid hashes and chain linkage'
-                            : 'FAILED: ' + result.message
-                    };
-                }
-                return s;
-            });
+            const updated = await verifyRun({ runId });
+            this.rawRuns = this.rawRuns.map((r) => (r.runId === runId
+                ? { ...r, integrity: updated.integrity, lastVerifiedAt: updated.lastVerifiedAt, status: updated.status }
+                : r));
+            const ok = updated.integrity === 'Verified';
+            this.dispatchEvent(new ShowToastEvent({
+                title: ok ? 'Verified' : 'Tampered',
+                message: ok
+                    ? 'Every step of ' + updated.name + ' matches what was recorded.'
+                    : 'A step of ' + updated.name + ' no longer matches what was recorded.',
+                variant: ok ? 'success' : 'error'
+            }));
         } catch (error) {
-            console.error('Verification error:', error);
+            this.dispatchEvent(new ShowToastEvent({ title: 'Could not verify', message: reduceError(error), variant: 'error' }));
+        } finally {
+            this.verifying.delete(runId);
+            this.buildView();
         }
     }
+
+    // Build the view model the template renders.
+    buildView() {
+        this.runs = this.rawRuns.map((r) => {
+            const integrity = r.integrity === 'Verified' || r.integrity === 'Tampered' ? r.integrity : 'Not checked';
+            return {
+                ...r,
+                statusClass: 'slds-badge ' + (STATUS_VARIANT[r.status] || ''),
+                showIntegrity: r.tamperEvident,
+                integrityLabel: integrity,
+                integrityClass: 'slds-badge ' + (integrity === 'Verified' ? 'slds-theme_success'
+                    : integrity === 'Tampered' ? 'slds-theme_error' : ''),
+                hasVerifiedTime: r.tamperEvident && !!r.lastVerifiedAt,
+                isVerifying: this.verifying.has(r.runId),
+                showVerify: r.tamperEvident && r.status !== 'Active',
+                stepsLabel: r.entryCount === 1 ? '1 step' : r.entryCount + ' steps',
+                otherRecord: !r.aboutThisRecord,
+                hasActedUnder: !!(r.agentVersion || r.policyReference),
+                snapshotUrl: r.instructionsSnapshotId
+                    ? '/lightning/r/Agent_Instructions_Snapshot__c/' + r.instructionsSnapshotId + '/view' : null,
+                runUrl: '/lightning/r/Agent_Audit_Session__c/' + r.runId + '/view',
+                entries: (r.entries || []).map((e) => ({
+                    ...e,
+                    icon: TYPE_ICONS[e.type] || 'utility:record',
+                    summaryText: e.summary || e.typeLabel,
+                    captureClass: 'capture ' + (e.capturedByCode ? 'capture-code' : 'capture-agent'),
+                    isExpanded: this.expanded.has(e.entryId),
+                    toggleLabel: this.expanded.has(e.entryId) ? 'Hide details' : 'Details',
+                    hasFieldChanges: e.fieldChanges && e.fieldChanges.length > 0,
+                    fieldChangeRows: (e.fieldChanges || []).map((c, i) => ({
+                        key: e.entryId + '-' + i,
+                        label: c.label || c.field,
+                        before: c.before == null ? '(blank)' : c.before,
+                        after: c.after == null ? '(blank)' : c.after
+                    })),
+                    hasHidden: e.hiddenFieldChanges > 0,
+                    hiddenLabel: e.hiddenFieldChanges === 1
+                        ? '1 more field changed that you do not have access to.'
+                        : e.hiddenFieldChanges + ' more fields changed that you do not have access to.',
+                    elsewhere: !!e.targetRecordId && !e.targetsThisRecord,
+                    elsewhereUrl: e.targetRecordId ? '/lightning/r/' + e.targetRecordId + '/view' : null
+                }))
+            };
+        });
+    }
+}
+
+function reduceError(error) {
+    if (!error) {
+        return 'Unknown error';
+    }
+    if (error.body && error.body.message) {
+        return error.body.message;
+    }
+    return error.message || JSON.stringify(error);
 }
