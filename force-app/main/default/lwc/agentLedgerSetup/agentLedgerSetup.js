@@ -22,6 +22,8 @@ const PERMISSION_SETS = [
     { name: 'AgentLedger_Tamper_Testing', label: 'AgentLedger Tamper Testing', note: 'Testing only. Should be 0 in production.' }
 ];
 const APPLY_DELAY_MS = 5000;
+const SETTING_FIELDS = ['developerName', 'agentApiName', 'agentforceAgent', 'enabled', 'mode', 'onLogFailure',
+    'autoCloseMinutes', 'storeFieldValues', 'neverStoreFields', 'policyReference', 'policyText'];
 
 /**
  * AgentLedger Setup: org-wide settings, settings per agent, and health.
@@ -180,7 +182,14 @@ export default class AgentLedgerSetup extends LightningElement {
     async save(setting, what) {
         this.isSaving = true;
         try {
-            await saveSetting({ setting });
+            // Send only the fields the server knows.
+            const payload = {};
+            SETTING_FIELDS.forEach((f) => {
+                if (setting[f] !== undefined) {
+                    payload[f] = setting[f] === '' ? null : setting[f];
+                }
+            });
+            await saveSetting({ setting: payload });
             this.toast(what + ' saved', 'Changes apply within a few seconds.', 'success');
             // Custom metadata is deployed asynchronously; reload once it has applied.
             // eslint-disable-next-line @lwc/lwc/no-async-operation

@@ -11,17 +11,17 @@
 public with sharing class AgentLedgerSetupController {
 
     public class SettingView {
-        @AuraEnabled public String developerName;
-        @AuraEnabled public String agentApiName;
-        @AuraEnabled public String agentforceAgent;
-        @AuraEnabled public Boolean enabled;
-        @AuraEnabled public String mode;
-        @AuraEnabled public String onLogFailure;
-        @AuraEnabled public Integer autoCloseMinutes;
-        @AuraEnabled public Boolean storeFieldValues;
-        @AuraEnabled public String neverStoreFields;
-        @AuraEnabled public String policyReference;
-        @AuraEnabled public String policyText;
+        @AuraEnabled public String developerName { get; set; }
+        @AuraEnabled public String agentApiName { get; set; }
+        @AuraEnabled public String agentforceAgent { get; set; }
+        @AuraEnabled public Boolean enabled { get; set; }
+        @AuraEnabled public String mode { get; set; }
+        @AuraEnabled public String onLogFailure { get; set; }
+        @AuraEnabled public Integer autoCloseMinutes { get; set; }
+        @AuraEnabled public Boolean storeFieldValues { get; set; }
+        @AuraEnabled public String neverStoreFields { get; set; }
+        @AuraEnabled public String policyReference { get; set; }
+        @AuraEnabled public String policyText { get; set; }
     }
 
     public class AgentView {
