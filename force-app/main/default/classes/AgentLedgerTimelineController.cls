@@ -221,7 +221,7 @@ public without sharing class AgentLedgerTimelineController {
         v.reasoning = e.Reasoning__c;
         v.summary = String.isNotBlank(e.Summary__c) ? e.Summary__c : firstLine(e.Reasoning__c);
         v.inputContext = e.Input_Context__c;
-        v.outputResult = e.Output_Result__c;
+        v.outputResult = readableResult(e.Output_Result__c, fieldMap(e.Target_Object__c));
         v.capturedByCode = e.Capture_Method__c == 'Recorded_Action' || e.Capture_Method__c == 'Agent_Script'
             || e.Capture_Method__c == 'Change_Detector';
         v.captureLabel = v.capturedByCode ? 'Recorded automatically' : 'Reported by the agent';
@@ -246,11 +246,7 @@ public without sharing class AgentLedgerTimelineController {
         } catch (Exception ex) {
             return;
         }
-        Map<String, Schema.SObjectField> fields = null;
-        if (String.isNotBlank(e.Target_Object__c)) {
-            Schema.SObjectType t = Schema.getGlobalDescribe().get(e.Target_Object__c.toLowerCase());
-            fields = t == null ? null : t.getDescribe().fields.getMap();
-        }
+        Map<String, Schema.SObjectField> fields = fieldMap(e.Target_Object__c);
         for (Object o : raw) {
             Map<String, Object> c = (Map<String, Object>) o;
             String fieldName = (String) c.get('field');
@@ -266,6 +262,44 @@ public without sharing class AgentLedgerTimelineController {
             fc.after = (String) c.get('after');
             v.fieldChanges.add(fc);
         }
+    }
+
+    private static Map<String, Schema.SObjectField> fieldMap(String objectName) {
+        if (String.isBlank(objectName)) {
+            return null;
+        }
+        Schema.SObjectType t = Schema.getGlobalDescribe().get(objectName.toLowerCase());
+        return t == null ? null : t.getDescribe().fields.getMap();
+    }
+
+    /**
+     * A flat JSON object of field values (a lookup's result) as "Field: value"
+     * lines, leaving out fields the viewer cannot read. Anything else as stored.
+     */
+    @TestVisible
+    private static String readableResult(String stored, Map<String, Schema.SObjectField> fields) {
+        if (String.isBlank(stored) || !stored.trim().startsWith('{')) {
+            return stored;
+        }
+        Map<String, Object> values;
+        try {
+            values = (Map<String, Object>) System.JSON.deserializeUntyped(stored);
+        } catch (Exception ex) {
+            return stored;
+        }
+        List<String> lines = new List<String>();
+        for (String key : values.keySet()) {
+            Object value = values.get(key);
+            if (value instanceof Map<String, Object> || value instanceof List<Object>) {
+                return stored;
+            }
+            Schema.SObjectField f = fields == null ? null : fields.get(key.toLowerCase());
+            if (f != null && !f.getDescribe().isAccessible()) {
+                continue;
+            }
+            lines.add(key + ': ' + (value == null ? '(blank)' : String.valueOf(value)));
+        }
+        return lines.isEmpty() ? null : String.join(lines, '\n');
     }
 
     private static String firstLine(String s) {

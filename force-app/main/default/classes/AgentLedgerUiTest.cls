@@ -69,6 +69,20 @@ private class AgentLedgerUiTest {
     }
 
     @isTest
+    static void aLookupResultReadsAsFieldsAndValues() {
+        Map<String, Schema.SObjectField> caseFields = Schema.SObjectType.Case.fields.getMap();
+        String readable = AgentLedgerTimelineController.readableResult(
+            '{"Priority":"High","Status":"New","Subject":null}', caseFields);
+        System.assert(readable.contains('Priority: High'), readable);
+        System.assert(readable.contains('Status: New'), readable);
+        System.assert(readable.contains('Subject: (blank)'), readable);
+        System.assert(!readable.contains('{'), readable);
+        System.assertEquals('Escalate', AgentLedgerTimelineController.readableResult('Escalate', caseFields));
+        System.assertEquals('{"a":{"b":1}}', AgentLedgerTimelineController.readableResult('{"a":{"b":1}}', null));
+        System.assertEquals('{not json', AgentLedgerTimelineController.readableResult('{not json', null));
+    }
+
+    @isTest
     static void activityLogRunsHideIntegrityDetails() {
         settings('Activity_Log');
         Case c = newCase();
