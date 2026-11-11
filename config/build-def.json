@@ -1,0 +1,16 @@
+{
+  "orgName": "AgentLedger build",
+  "edition": "Developer",
+  "features": ["Einstein1AIPlatform", "EnableSetPasswordInApi"],
+  "settings": {
+    "lightningExperienceSettings": {
+      "enableS1DesktopEnabled": true
+    },
+    "einsteinGptSettings": {
+      "enableEinsteinGptPlatform": true
+    },
+    "agentPlatformSettings": {
+      "enableAgentPlatform": true
+    }
+  }
+}
