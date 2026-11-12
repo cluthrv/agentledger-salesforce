@@ -89,7 +89,9 @@ Then, in the org:
 
 An unlocked package for one-click install will follow.
 
-**Upgrading:** Salesforce does not deploy Apex while a scheduled job is pending.
+**Upgrading:** settings are kept: the package does not ship the org default
+record, which the Setup page creates on its first save. Salesforce does not
+deploy Apex while a scheduled job is pending.
 `scripts/deploy.mjs` pauses and resumes the auto-close job for you; when
 installing another way, turn auto-close off on the Setup page first and on again
 afterwards.

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Hardening Full</label>
+    <objectPermissions>
+        <allowCreate>true</allowCreate><allowDelete>false</allowDelete><allowEdit>true</allowEdit>
+        <allowRead>true</allowRead><modifyAllRecords>false</modifyAllRecords>
+        <object>Hardening_Item__c</object><viewAllRecords>false</viewAllRecords>
+    </objectPermissions>
+    <fieldPermissions><editable>true</editable><field>Hardening_Item__c.Amount__c</field><readable>true</readable></fieldPermissions>
+    <fieldPermissions><editable>true</editable><field>Hardening_Item__c.Status__c</field><readable>true</readable></fieldPermissions>
+    <fieldPermissions><editable>true</editable><field>Hardening_Item__c.Secret__c</field><readable>true</readable></fieldPermissions>
+</PermissionSet>

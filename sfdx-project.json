@@ -8,6 +8,10 @@
       "versionNumber": "0.1.0.NEXT",
       "versionDescription": "Activity log for Agentforce agents: recorded Get/Update/Create Record actions, a record-page timeline, optional tamper evidence (v2 hashing, Merkle seal), Setup and Agent Activity pages. Requires Agentforce.",
       "definitionFile": "config/build-def.json"
+    },
+    {
+      "path": "hardening",
+      "default": false
     }
   ],
   "name": "agentledger-sfdc",
@@ -15,6 +19,9 @@
   "sfdcLoginUrl": "https://login.salesforce.com",
   "sourceApiVersion": "65.0",
   "packageAliases": {
-    "AgentLedger for Agentforce": "0HogK0000005QbNSAU"
+    "AgentLedger for Agentforce": "0HogK0000005QbNSAU",
+    "AgentLedger for Agentforce@0.1.0-1": "04tgK000000ZNPxQAO",
+    "AgentLedger for Agentforce@0.1.0-2": "04tgK000000ZnKPQA0",
+    "AgentLedger for Agentforce@0.1.0-3": "04tgK000000ZnM1QAK"
   }
 }

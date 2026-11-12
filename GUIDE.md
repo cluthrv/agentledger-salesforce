@@ -145,6 +145,17 @@ An hourly job closes runs with no activity for longer than the auto-close time
 **Incomplete**, so a missing close is visible. Turn it on or off, or run it now,
 on the Setup page.
 
+## Limits
+
+- **Entries per transaction:** each entry costs 2 SOQL queries, so about 45
+  entries fit in one Apex transaction (Salesforce allows 100 queries). Agents
+  call one action per transaction; code that logs many steps at once should
+  split them across transactions.
+- **Run size:** a run of 200 entries seals in under 0.1 s of CPU, verifies in
+  about 0.3 s and exports as about 150 KB of JSON.
+- **Concurrent writers:** steps written to one run at the same time are
+  serialized by a row lock; the chain stays linear.
+
 ## Development
 
 ```bash
@@ -155,6 +166,28 @@ node scripts/make-hash-vectors.mjs         # regenerate hash vectors from the np
 ```
 
 The deploy script pauses the auto-close job during the deploy and resumes it.
+
+### Hardening suite
+
+Exercises an installed package in a clean org, the way a customer would get
+there, and prints PASS or FAIL per check:
+
+```bash
+node hardening/setup.mjs <dev-hub> al-hard <earlier 04t> <new 04t>   # org, install, use, upgrade, users
+node hardening/run.mjs al-hard                                       # the scenarios
+node scripts/check-export.mjs al-hard <run names>                    # verify exports with the npm library
+```
+
+Setup installs the earlier version, sets the org default and records a run,
+upgrades, and checks that settings and runs survived. It then deploys test-only
+metadata (`hardening/main`: a private object with a field one user cannot read,
+a validation rule, a trigger that can force a log failure, and agent settings
+per mode) and creates a viewer and an agent user. The scenarios cover agent
+flows on Case, Account, Contact, Lead, Opportunity and a custom object; failed
+changes and failed log entries in each mode; recording off and closed runs;
+volume; concurrent writers; and, as Apex tests that run as those users, what a
+viewer without access sees and what an agent user can reach. `ONLY=volume,access`
+runs a subset.
 `make-hash-vectors.mjs` needs `npm install --prefix scripts/.vectors @vluthra/agent-ledger@0.2.0`.
 
 | Test class | Covers |

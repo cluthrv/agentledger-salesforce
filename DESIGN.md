@@ -241,6 +241,29 @@ verify, by design. Checking real exports with the published libraries found
 that the Python verifier rejected action types outside its enum ("Query",
 "Data_Change"); 0.3.0 keeps unknown types as strings.
 
+### 6.6 Hardening (November 2026)
+
+`hardening/` installs the package in a clean org and exercises it as an admin,
+a viewer and an agent user (75 checks). Findings:
+
+- **An upgrade reset the org's settings.** The package shipped the
+  `Org_Default` custom metadata record, and installing a new version
+  overwrote the customer's copy (Tamper-Evident and 45 minutes became Activity
+  Log and 30). The record is no longer shipped; the code already falls back to
+  built-in defaults and the Setup page creates the record on first save.
+  Upgrading from a version that shipped it keeps the customer's record.
+- **About 45 entries per transaction** (2 SOQL each); see GUIDE Limits.
+- **No unlogged change on any failure path:** an invalid field, a validation
+  rule, a deleted record, bad JSON, or a failed log entry in a tamper-evident
+  run leaves the record unchanged and nothing logged; Activity Log with
+  Continue keeps the change and reports it as not logged.
+- **Access:** a viewer gets an empty timeline, and no export or verify, for a
+  record they cannot read; values of a field they cannot read appear nowhere;
+  an agent user cannot read or change records outside its own access, and
+  refused attempts leave no entries.
+- Standard and Platform users cannot run anonymous Apex, so the user scenarios
+  are Apex tests that impersonate the users.
+
 ## 7. Anchoring
 
 | Provider | How | Notes |
