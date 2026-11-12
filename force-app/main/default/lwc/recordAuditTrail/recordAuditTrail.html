@@ -50,10 +50,17 @@
                                 </div>
                             </template>
                         </div>
-                        <template lwc:if={run.showVerify}>
-                            <lightning-button label="Verify" icon-name="utility:shield" data-run-id={run.runId}
-                                onclick={handleVerify} disabled={run.isVerifying}></lightning-button>
-                        </template>
+                        <lightning-button-group>
+                            <template lwc:if={run.showVerify}>
+                                <lightning-button label="Verify" icon-name="utility:shield" data-run-id={run.runId}
+                                    onclick={handleVerify} disabled={run.isVerifying}></lightning-button>
+                            </template>
+                            <template lwc:if={run.showExport}>
+                                <lightning-button label="Export" icon-name="utility:download" data-run-id={run.runId}
+                                    title="Download this run to verify it outside Salesforce"
+                                    onclick={handleExport} disabled={run.isExporting}></lightning-button>
+                            </template>
+                        </lightning-button-group>
                     </div>
 
                     <ol class="entries">

@@ -23,6 +23,7 @@ Open source (MIT), native to Salesforce, no external services.
 | **Recorded actions** | Get, Update and Create Record (AgentLedger): drop-in replacements for the standard record actions. The change and its log entry are written together, so the agent cannot change data without it being logged. |
 | **What the agent acted under** | Every run records the agent version, a fingerprint of its instructions (the full text is kept once per version) and the policy it acted under. |
 | **Modes** | Activity Log (default), Tamper-Evident, or Tamper-Evident + Anchored, set for the org and per agent. |
+| **Export and verify anywhere** | Export downloads a run as JSON. Anyone can verify it outside Salesforce with `npx @vluthra/agent-ledger verify` or `python -m agentledger verify`. |
 | **Agent Activity page** | Recent runs across the org, filtered by status, integrity or agent. |
 | **Setup page** | Settings for the org and each agent, health, and the auto-close job, without Setup menus. |
 
@@ -37,6 +38,7 @@ Each entry: summary · reasoning · field changes · how it was captured · agen
 
 Run closes (agent, or auto-close after inactivity) ──► Merkle root over all entries
 Verify (tamper-evident modes) ──► recompute hashes, chain and root ──► Verified / Tampered
+Export ──► run as JSON ──► npx @vluthra/agent-ledger verify run.json (outside Salesforce)
 ```
 
 Runs open automatically on the first AgentLedger action, so agents do not need a
@@ -56,8 +58,9 @@ job.
   reports them. Removing the standard Update Record action from an agent closes
   that gap for data changes.
 - **Inside one org, a determined administrator** can deactivate triggers and
-  rewrite records and fingerprints together. External anchoring and exported
-  evidence (coming next) address that.
+  rewrite records and fingerprints together. A copy exported earlier and kept
+  outside the org shows such a rewrite; external anchoring (coming next) shows it
+  without a copy.
 
 ## Install
 

@@ -228,8 +228,18 @@ Planned for Phase 3.
 
 Downloads the run as JSON in the library's `ExportedSession` shape, with the
 anchor token when present. An auditor verifies it offline:
-`npx`-style check with the npm package, Python with PyPI, and the RFC 3161 token
-with `openssl ts -verify`.
+`npx @vluthra/agent-ledger verify` or `python -m agentledger verify` (0.3.0),
+and the RFC 3161 token with `openssl ts -verify`.
+
+Built (November 2026): `AgentLedgerEvidence`. Each record is
+`HashChainService.entryContentV2` plus the stored hash, so the verifiers
+recompute from the file alone; a `salesforce` block (org, run, exporter) is
+ignored by them. Values of fields the exporter cannot read are replaced by
+`[hidden]` (with the summary, request and result of that change, which repeat
+the values) and listed in `salesforce.hiddenFields`; those entries do not
+verify, by design. Checking real exports with the published libraries found
+that the Python verifier rejected action types outside its enum ("Query",
+"Data_Change"); 0.3.0 keeps unknown types as strings.
 
 ## 7. Anchoring
 

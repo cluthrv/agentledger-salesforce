@@ -232,6 +232,13 @@ public without sharing class AgentLedgerTimelineController {
         v.policyReference = e.Policy_Reference__c;
         v.hash = tamperEvident ? e.Record_Hash__c : null;
         addFieldChanges(v, e);
+        if (v.hiddenFieldChanges > 0) {
+            // The summary, request and result of a change repeat its values.
+            v.summary = 'Changed ' + (String.isBlank(e.Target_Object__c) ? 'a record' : e.Target_Object__c)
+                + ', including fields you do not have access to';
+            v.inputContext = null;
+            v.outputResult = null;
+        }
         return v;
     }
 
@@ -250,8 +257,7 @@ public without sharing class AgentLedgerTimelineController {
         for (Object o : raw) {
             Map<String, Object> c = (Map<String, Object>) o;
             String fieldName = (String) c.get('field');
-            Schema.SObjectField f = fields == null || fieldName == null ? null : fields.get(fieldName.toLowerCase());
-            if (f != null && !f.getDescribe().isAccessible()) {
+            if (!AgentLedgerAccess.canReadField(fields, fieldName)) {
                 v.hiddenFieldChanges++;
                 continue;
             }
@@ -293,8 +299,7 @@ public without sharing class AgentLedgerTimelineController {
             if (value instanceof Map<String, Object> || value instanceof List<Object>) {
                 return stored;
             }
-            Schema.SObjectField f = fields == null ? null : fields.get(key.toLowerCase());
-            if (f != null && !f.getDescribe().isAccessible()) {
+            if (!AgentLedgerAccess.canReadField(fields, key)) {
                 continue;
             }
             lines.add(key + ': ' + (value == null ? '(blank)' : String.valueOf(value)));

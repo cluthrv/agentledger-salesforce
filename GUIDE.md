@@ -106,6 +106,20 @@ and one record per agent. Custom metadata, so settings deploy between orgs.
   intact again.
 - **Runs from before v2** keep verifying with the original (v1) rules, in the
   time zone of the user who recorded them.
+- **Export:** the Export button on a tamper-evident run downloads it as JSON in
+  the open-source libraries' exported-session format: each entry exactly as
+  hashed, with its hash, and the run's fingerprint. Verify it anywhere:
+
+  ```bash
+  npx @vluthra/agent-ledger verify agentledger-AAS-0047.json   # Node.js
+  python -m agentledger verify agentledger-AAS-0047.json      # pip install vluthra-agent-ledger
+  ```
+
+  Both need version 0.3.0 or later. Whoever can see a run can export it. Values of fields the
+  exporting user cannot read are left out; those entries are listed in the file
+  (`salesforce.hiddenFields`) and do not verify. Runs from before v2 cannot be
+  exported. `node scripts/check-export.mjs <org> [run names]` exports runs from
+  an org and verifies them with the published npm library.
 - **Protection:** triggers block creating, editing or deleting ledger records
   outside AgentLedger. For testing tamper detection, the **AgentLedger Tamper
   Testing** permission set allows editing entries; verification still detects

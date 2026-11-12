@@ -63,7 +63,7 @@ permissionSet('AgentLedger_Admin', 'AgentLedger Admin',
 permissionSet('AgentLedger_User', 'AgentLedger User',
   'For people who work on records and use employee agents: read the activity log of records they can see, verify runs, and run the AgentLedger agent actions.',
   x.app('AgentLedger') +
-  ['RecordAuditTrailController', 'AgentLedgerTimelineController', 'AgentLedgerActivityController', ...ACTIONS].sort().map(x.cls).join('') +
+  ['RecordAuditTrailController', 'AgentLedgerTimelineController', 'AgentLedgerActivityController', 'AgentLedgerEvidence', ...ACTIONS].sort().map(x.cls).join('') +
   allFields.map((f) => x.fld(f, false)).join('') + OBJECTS.map((o) => x.obj(o)).join('') + x.tab('AgentLedger_Activity'));
 
 permissionSet('AgentLedger_Agent', 'AgentLedger Agent',

@@ -2,6 +2,7 @@ import { LightningElement, api } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import getTimeline from '@salesforce/apex/AgentLedgerTimelineController.getTimeline';
 import verifyRun from '@salesforce/apex/AgentLedgerTimelineController.verifyRun';
+import exportRun from '@salesforce/apex/AgentLedgerEvidence.exportRun';
 
 const PAGE_SIZE = 10;
 
@@ -37,6 +38,7 @@ export default class RecordAuditTrail extends LightningElement {
     loadError;
     expanded = new Set();
     verifying = new Set();
+    exporting = new Set();
     rawRuns = [];
 
     connectedCallback() {
@@ -108,6 +110,32 @@ export default class RecordAuditTrail extends LightningElement {
         }
     }
 
+    // Downloads the run as JSON that the open-source verifiers check outside Salesforce.
+    async handleExport(event) {
+        const runId = event.currentTarget.dataset.runId;
+        this.exporting.add(runId);
+        this.buildView();
+        try {
+            const result = await exportRun({ runId });
+            const link = document.createElement('a');
+            link.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(result.json);
+            link.download = result.fileName;
+            link.click();
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Exported',
+                message: result.hiddenEntries > 0
+                    ? result.hiddenEntries + ' step(s) include fields you do not have access to; their values were left out, so those steps will not verify.'
+                    : 'Verify it anywhere with: npx @vluthra/agent-ledger verify ' + result.fileName,
+                variant: result.hiddenEntries > 0 ? 'warning' : 'success'
+            }));
+        } catch (error) {
+            this.dispatchEvent(new ShowToastEvent({ title: 'Could not export', message: reduceError(error), variant: 'error' }));
+        } finally {
+            this.exporting.delete(runId);
+            this.buildView();
+        }
+    }
+
     // Build the view model the template renders.
     buildView() {
         this.runs = this.rawRuns.map((r) => {
@@ -122,6 +150,8 @@ export default class RecordAuditTrail extends LightningElement {
                 hasVerifiedTime: r.tamperEvident && !!r.lastVerifiedAt,
                 isVerifying: this.verifying.has(r.runId),
                 showVerify: r.tamperEvident && r.status !== 'Active',
+                showExport: r.tamperEvident,
+                isExporting: this.exporting.has(r.runId),
                 stepsLabel: r.entryCount === 1 ? '1 step' : r.entryCount + ' steps',
                 otherRecord: !r.aboutThisRecord,
                 hasActedUnder: !!(r.agentVersion || r.policyReference),
