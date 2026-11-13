@@ -4,6 +4,7 @@ import getSetup from '@salesforce/apex/AgentLedgerSetupController.getSetup';
 import saveSetting from '@salesforce/apex/AgentLedgerSetupController.saveSetting';
 import setAutoClose from '@salesforce/apex/AgentLedgerSetupController.setAutoClose';
 import runAutoCloseNow from '@salesforce/apex/AgentLedgerSetupController.runAutoCloseNow';
+import { agentInstructions } from './instructions';
 
 const MODES = [
     { label: 'Activity Log', value: 'Activity_Log' },
@@ -145,6 +146,39 @@ export default class AgentLedgerSetup extends LightningElement {
         const value = event.target.type === 'toggle' || event.target.type === 'checkbox'
             ? event.target.checked : event.detail.value;
         this.agentForm = { ...this.agentForm, [field]: value };
+    }
+
+    /** The instruction to add to the agent, from the values in the form (saved or not). */
+    get agentInstructionText() {
+        return this.agentForm
+            ? agentInstructions({ agentId: this.agentForm.agentApiName, policyReference: this.agentForm.policyReference })
+            : '';
+    }
+
+    async handleCopyInstructions() {
+        const text = this.agentInstructionText;
+        try {
+            await navigator.clipboard.writeText(text);
+            this.toast('Instructions copied', 'Paste them as a new instruction in the subagent of this agent.', 'success');
+            return;
+        } catch (e) {
+            // Clipboard API not available here: copy from the selected text instead.
+        }
+        const box = this.template.querySelector('textarea.instructions');
+        box.focus();
+        box.select();
+        let copied = false;
+        try {
+            // eslint-disable-next-line @lwc/lwc/no-document-query
+            copied = document.execCommand('copy');
+        } catch (e) {
+            copied = false;
+        }
+        if (copied) {
+            this.toast('Instructions copied', 'Paste them as a new instruction in the subagent of this agent.', 'success');
+        } else {
+            this.toast('Press Ctrl+C (Cmd+C on a Mac) to copy', 'The instructions are selected.', 'info');
+        }
     }
 
     handleCloseAgent() {

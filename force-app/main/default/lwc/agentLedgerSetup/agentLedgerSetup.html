@@ -135,6 +135,18 @@
                                     onchange={handleAgentChange} disabled={readOnly}
                                     field-level-help="Its fingerprint is recorded on every run, so a later change to the policy is visible."></lightning-textarea>
                             </div>
+                            <div class="instructions-block slds-m-top_medium">
+                                <h4 class="slds-text-title_bold">Instructions for this agent</h4>
+                                <p class="slds-text-body_small slds-text-color_weak slds-m-vertical_xx-small">
+                                    In Agentforce Builder, add these as a new instruction on each subagent that uses
+                                    AgentLedger actions, next to its own instructions. If those name the standard Get,
+                                    Update or Create Record actions, change them to the AgentLedger ones. Save these
+                                    settings too, so the Agent Id below is recognised.
+                                </p>
+                                <textarea class="instructions" readonly rows="16" value={agentInstructionText}></textarea>
+                                <lightning-button label="Copy instructions" icon-name="utility:copy"
+                                    onclick={handleCopyInstructions} class="slds-m-top_x-small"></lightning-button>
+                            </div>
                             <div class="slds-m-top_small">
                                 <lightning-button variant="brand" label="Save agent settings" onclick={handleSaveAgent}
                                     disabled={readOnly}></lightning-button>
