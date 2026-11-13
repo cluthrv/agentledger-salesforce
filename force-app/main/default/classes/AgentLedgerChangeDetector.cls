@@ -253,6 +253,16 @@ public without sharing class AgentLedgerChangeDetector {
         return latest.isEmpty() ? null : latest[0];
     }
 
+    /**
+     * Fields only Salesforce sets (for example Opportunity Last Stage Change
+     * Date): nobody can create or edit them, or be given permission to. They
+     * follow from the agent's change and would only repeat it.
+     */
+    @TestVisible
+    private static Boolean maintainedBySalesforce(Schema.DescribeFieldResult fd) {
+        return !fd.isCreateable() && !fd.isUpdateable() && !fd.isPermissionable();
+    }
+
     /** What changed: changed fields on update, set fields on insert, nothing on delete. */
     private static List<AgentLedgerRecordSupport.FieldChange> changes(SObject row, SObject old,
             System.TriggerOperation op, Schema.DescribeSObjectResult d, AgentLedgerSettings.Resolved settings) {
@@ -275,7 +285,7 @@ public without sharing class AgentLedgerChangeDetector {
                 continue;
             }
             Schema.DescribeFieldResult fd = f.getDescribe();
-            if (fd.isCalculated() || fd.isAutoNumber()) {
+            if (fd.isCalculated() || fd.isAutoNumber() || maintainedBySalesforce(fd)) {
                 continue;
             }
             out.add(AgentLedgerRecordSupport.change(settings, d.getName(), fd, before, after));

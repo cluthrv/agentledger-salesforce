@@ -77,7 +77,8 @@
     font-size: 0.8125rem;
 }
 .changes td {
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+    word-break: normal;
     white-space: normal;
 }
 .details {

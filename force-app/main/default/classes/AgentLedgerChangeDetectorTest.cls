@@ -72,6 +72,23 @@ private class AgentLedgerChangeDetectorTest {
     }
 
     @isTest
+    static void fieldsSalesforceSetsItselfAreLeftOut() {
+        settings('');
+        AgentLedgerChangeDetector.agentActionForTest = false;
+        Opportunity o = new Opportunity(Name = 'Detector', StageName = 'Prospecting', CloseDate = Date.today().addDays(30), Amount = 50000);
+        insert o;
+        AgentLedgerChangeDetector.agentActionForTest = true;
+        update new Opportunity(Id = o.Id, StageName = 'Needs Analysis');
+
+        String changes = detected()[0].Field_Changes__c;
+        System.assert(changes.contains('Needs Analysis'), changes);
+        System.assert(!changes.containsIgnoreCase('LastStageChangeDate'), 'set by Salesforce, not the agent: ' + changes);
+        System.assert(AgentLedgerChangeDetector.maintainedBySalesforce(Opportunity.LastStageChangeDate.getDescribe()));
+        System.assert(!AgentLedgerChangeDetector.maintainedBySalesforce(Opportunity.StageName.getDescribe()));
+        System.assert(!AgentLedgerChangeDetector.maintainedBySalesforce(Opportunity.Amount.getDescribe()));
+    }
+
+    @isTest
     static void anUnidentifiedRunIsAboutOneRecord() {
         settings('');
         Case a = newCase();
