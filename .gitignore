@@ -2,3 +2,4 @@
 # Library installed to generate hash test vectors
 scripts/.vectors/
 .sf/
+.sfdx/
