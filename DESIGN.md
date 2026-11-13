@@ -257,7 +257,7 @@ that the Python verifier rejected action types outside its enum ("Query",
 ### 6.6 Hardening (November 2026)
 
 `hardening/` installs the package in a clean org and exercises it as an admin,
-a viewer and an agent user (87 checks on 0.1.0-4, upgraded from 0.1.0-3). Findings:
+a viewer and an agent user (87 checks on 0.1.0-5, upgraded from 0.1.0-3 through 0.1.0-4). Findings:
 
 - **An upgrade reset the org's settings.** The package shipped the
   `Org_Default` custom metadata record, and installing a new version
