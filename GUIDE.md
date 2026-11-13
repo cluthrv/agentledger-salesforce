@@ -155,9 +155,10 @@ user's open run for that record, or their most recent open run, or a new run for
 it has before and after values but no reasoning. In Tamper-Evident mode
 (roll back), a change the detector cannot log is refused.
 
-How it knows: an action run by an agent executes with the request type
-`INVOCABLE_ACTION`; a person's change through the UI or API, and a Flow called
-through the Actions API, do not. AgentLedger's own actions mark their changes, so
+How it knows: an Apex action run by an agent executes with the request type
+`INVOCABLE_ACTION`; a Flow action run by an agent arrives through the agent
+runtime's call to `/services/data/vNN.N/support/functions/`. A person's change
+through the UI or API, and a Flow called through the Actions API, are neither. AgentLedger's own actions mark their changes, so
 they are not logged twice. Bulk changes log the first 20 records one by one and
 the rest in one entry.
 

@@ -204,4 +204,16 @@ private class AgentLedgerChangeDetectorTest {
         AgentLedgerChangeDetector.agentActionForTest = null;
         System.assert(!AgentLedgerChangeDetector.isActionRequest(), 'a test run is not an action request');
     }
+
+    @isTest
+    static void theAgentRuntimesFunctionCallIsAnAgentAction() {
+        String host = 'https://acme.my.salesforce.com';
+        System.assert(AgentLedgerChangeDetector.isAgentFunctionCall(host + '/services/data/v68.0/support/functions/172gK00000WFySr'));
+        System.assert(AgentLedgerChangeDetector.isAgentFunctionCall('/services/data/v65.0/support/functions/x'));
+        System.assert(!AgentLedgerChangeDetector.isAgentFunctionCall(host + '/services/data/v68.0/sobjects/Case/500gK00001VKEkd'), 'a person through the API');
+        System.assert(!AgentLedgerChangeDetector.isAgentFunctionCall(host + '/services/data/v65.0/actions/custom/flow/My_Flow'), 'an integration running a Flow');
+        System.assert(!AgentLedgerChangeDetector.isAgentFunctionCall(host + '/services/apexrest/support/functions/x'), 'a custom REST endpoint');
+        System.assert(!AgentLedgerChangeDetector.isAgentFunctionCall(host + '/aura?r=1'), 'the Lightning UI');
+        System.assert(!AgentLedgerChangeDetector.isAgentFunctionCall(null));
+    }
 }

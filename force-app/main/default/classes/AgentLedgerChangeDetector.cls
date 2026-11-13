@@ -5,12 +5,15 @@
  * action, for example through the standard Update Record action or a Flow
  * action, so a change cannot escape the log by taking another path.
  *
- * Apex has no "agent" flag. What it does show (spike S1, November 2026) is
- * that an action an agent runs has the request quiddity INVOCABLE_ACTION.
- * Changes made by a person through the API, and by a Flow called through the
- * Actions REST API, ran as SYNCHRONOUS in the same test, so integrations are
- * not flagged. Observed with an Apex action run by an agent; standard and Flow
- * actions run by an agent are expected to behave the same (to be confirmed).
+ * Apex has no "agent" flag. What it does show (spike S1 and a live test,
+ * November 2026), with the agent driven through preview:
+ *   - an Apex action run by an agent has the request quiddity INVOCABLE_ACTION;
+ *   - a Flow action run by an agent is SYNCHRONOUS, like a person's API call,
+ *     but its request is the agent runtime's call to
+ *     /services/data/vNN.N/support/functions/<action>;
+ *   - a person's change through the UI or API, and a Flow called through the
+ *     Actions REST API (/actions/custom/flow/...), are SYNCHRONOUS on other
+ *     paths, so people and integrations are not flagged.
  * AgentLedger's own recorded actions mark their changes
  * (AgentLedgerGuard.beginRecordedChange) and are skipped here: they already
  * logged them, with the agent's reasoning.
@@ -59,7 +62,31 @@ public without sharing class AgentLedgerChangeDetector {
         if (agentActionForTest != null) {
             return agentActionForTest;
         }
-        return Request.getCurrent().getQuiddity() == Quiddity.INVOCABLE_ACTION;
+        Quiddity q = Request.getCurrent().getQuiddity();
+        if (q == Quiddity.INVOCABLE_ACTION) {
+            return true;
+        }
+        if (q != Quiddity.SYNCHRONOUS) {
+            return false;
+        }
+        String url = requestUrl();
+        System.debug(LoggingLevel.FINE, 'AgentLedger detector: ' + q + ' ' + url);
+        return isAgentFunctionCall(url);
+    }
+
+    /** The agent runtime runs an action through /services/data/vNN.N/support/functions/. */
+    @TestVisible
+    private static Boolean isAgentFunctionCall(String url) {
+        return url != null && Pattern.matches('(?i)^(https?://[^/]+)?/services/data/v\\d+\\.\\d+/support/functions/.*', url);
+    }
+
+    private static String requestUrl() {
+        try {
+            System.Url u = System.Url.getCurrentRequestUrl();
+            return u == null ? null : u.toExternalForm();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /** For a trigger: after insert, after update, after delete. */

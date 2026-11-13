@@ -164,7 +164,10 @@ Built (November 2026): `AgentLedgerChangeDetector` and triggers for the five
 objects. It acts only on `INVOCABLE_ACTION` requests that are not a recorded
 action (`AgentLedgerGuard.beginRecordedChange`). Checked in a live org: the
 agent's escalation through AgentLedger produced no duplicate; a Flow called
-through the Actions API was not flagged.
+through the Actions API was not flagged. The first live test of a Flow action
+run by the agent found it was missed (it runs as `SYNCHRONOUS`); after adding
+the `support/functions` request check, it was logged, and a person's API edit
+right after it was not.
 
 ### 5.4 Reconciliation with independent histories (added after the CACM review)
 
@@ -367,7 +370,7 @@ afterwards.
 
 | # | Question | Result |
 | --- | --- | --- |
-| S1 | Can Apex tell that a transaction is running inside an agent run? | **Yes, by request type (November 2026).** A spy trigger on Case, with the agent driven by `sf agent preview start/send`: the agent's action ran with quiddity `INVOCABLE_ACTION` and no session Id; a person's change through the REST API, and a Flow called through the Actions REST API, ran as `SYNCHRONOUS`. All ran as the same user. Observed with an Apex action; a standard or Flow action run by the agent is expected to match (to confirm). |
+| S1 | Can Apex tell that a transaction is running inside an agent run? | **Yes, by request type (November 2026).** A spy trigger on Case, with the agent driven by `sf agent preview start/send`: the agent's action ran with quiddity `INVOCABLE_ACTION` and no session Id; a person's change through the REST API, and a Flow called through the Actions REST API, ran as `SYNCHRONOUS`. All ran as the same user. A Flow action run by the agent (live test, 13 November) is **not** `INVOCABLE_ACTION` but `SYNCHRONOUS`, like a person's API call; what differs is the request: the agent runtime's `/services/data/vNN.N/support/functions/<action>`, readable through `URL.getCurrentRequestUrl()`. The detector accepts either. |
 | S2 | Can an unlocked package contain `GenAiFunction`? | **Yes.** A package version containing one action installed and registered the action (`GenAiFunctionDefinition` present). Caveat: validated builds fail in a default build org ("not available for deploy"); a releasable version needs a build org with Agentforce, probably via org shape. |
 | S3 | Agent Script hooks; billing; access to the final response | `before_reasoning`/`after_reasoning` run once per turn, deterministically; `@system_variables.user_input` is available; the agent's reply is **not** exposed. Decisions are therefore captured by gating: business actions are `available when` a decision has been recorded, and `after_reasoning` logs "no decision recorded" otherwise. Billing not documented: measure in the org. |
 | S4 | Does a DateTime field keep milliseconds? | **No** (sent 123 ms, stored 0). `Timestamp_Text__c` is required. |
