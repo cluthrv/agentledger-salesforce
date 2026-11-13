@@ -224,7 +224,9 @@ public without sharing class AgentLedgerChangeDetector {
 
     /**
      * The running user's open run: for this record if there is one, else their
-     * most recent, within the auto-close time.
+     * most recent agent run (an agent's conversation can touch other records),
+     * within the auto-close time. A run for an unidentified agent is about one
+     * record only, so other records' changes never join it.
      */
     private static Agent_Audit_Session__c openRun(Id recordId) {
         DateTime activeSince = DateTime.now().addMinutes(-AgentLedgerSettings.orgDefault().autoCloseMinutes);
@@ -245,7 +247,7 @@ public without sharing class AgentLedgerChangeDetector {
         List<Agent_Audit_Session__c> latest = [
             SELECT Id, Agent_Id__c FROM Agent_Audit_Session__c
             WHERE Status__c = :AgentAuditRecorder.STATUS_ACTIVE AND Started_By__c = :me
-              AND Last_Activity__c >= :activeSince
+              AND Last_Activity__c >= :activeSince AND Agent_Id__c != :UNIDENTIFIED_AGENT
             ORDER BY Last_Activity__c DESC LIMIT 1
         ];
         return latest.isEmpty() ? null : latest[0];

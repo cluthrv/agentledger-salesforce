@@ -72,6 +72,26 @@ private class AgentLedgerChangeDetectorTest {
     }
 
     @isTest
+    static void anUnidentifiedRunIsAboutOneRecord() {
+        settings('');
+        Case a = newCase();
+        Case b = newCase();
+        AgentLedgerChangeDetector.agentActionForTest = true;
+        update new Case(Id = a.Id, Status = 'Working');
+        update new Case(Id = b.Id, Status = 'Working');
+        update new Case(Id = a.Id, Status = 'Escalated');
+
+        List<Agent_Audit_Record__c> es = detected();
+        System.assertEquals(3, es.size());
+        System.assertNotEquals(es[0].Audit_Session__c, es[1].Audit_Session__c, 'Case B gets its own run, not the run for Case A');
+        Set<Id> runs = new Set<Id>();
+        for (Agent_Audit_Record__c e : es) {
+            runs.add(e.Audit_Session__c);
+        }
+        System.assertEquals(2, runs.size(), 'the second change to Case A joins the run for Case A');
+    }
+
+    @isTest
     static void recordedActionsAreNotLoggedTwice() {
         settings('');
         Case c = newCase();
