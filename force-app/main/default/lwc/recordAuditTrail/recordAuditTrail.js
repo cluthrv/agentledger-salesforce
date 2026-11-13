@@ -3,6 +3,7 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import getTimeline from '@salesforce/apex/AgentLedgerTimelineController.getTimeline';
 import verifyRun from '@salesforce/apex/AgentLedgerTimelineController.verifyRun';
 import exportRun from '@salesforce/apex/AgentLedgerEvidence.exportRun';
+import reconcileRun from '@salesforce/apex/AgentLedgerReconciliation.reconcileRun';
 
 const PAGE_SIZE = 10;
 
@@ -39,6 +40,8 @@ export default class RecordAuditTrail extends LightningElement {
     expanded = new Set();
     verifying = new Set();
     exporting = new Set();
+    reconciling = new Set();
+    reconciled = {};
     rawRuns = [];
 
     connectedCallback() {
@@ -136,6 +139,36 @@ export default class RecordAuditTrail extends LightningElement {
         }
     }
 
+    // Compares the run with Salesforce's own Field History.
+    async handleReconcile(event) {
+        const runId = event.currentTarget.dataset.runId;
+        this.reconciling.add(runId);
+        this.buildView();
+        try {
+            const result = await reconcileRun({ runId });
+            this.reconciled = { ...this.reconciled, [runId]: result };
+        } catch (error) {
+            this.dispatchEvent(new ShowToastEvent({ title: 'Could not check history', message: reduceError(error), variant: 'error' }));
+        } finally {
+            this.reconciling.delete(runId);
+            this.buildView();
+        }
+    }
+
+    reconcileView(runId) {
+        const r = this.reconciled[runId];
+        if (!r) {
+            return null;
+        }
+        const hasMissing = r.missing && r.missing.length > 0;
+        return {
+            summary: r.summary,
+            hasMissing,
+            missing: (r.missing || []).map((m, i) => ({ ...m, key: runId + '-' + i })),
+            boxClass: 'reconcile slds-box slds-box_x-small slds-m-bottom_small ' + (hasMissing ? 'reconcile-missing' : 'reconcile-ok')
+        };
+    }
+
     // Build the view model the template renders.
     buildView() {
         this.runs = this.rawRuns.map((r) => {
@@ -152,6 +185,8 @@ export default class RecordAuditTrail extends LightningElement {
                 showVerify: r.tamperEvident && r.status !== 'Active',
                 showExport: r.tamperEvident,
                 isExporting: this.exporting.has(r.runId),
+                isReconciling: this.reconciling.has(r.runId),
+                reconcile: this.reconcileView(r.runId),
                 stepsLabel: r.entryCount === 1 ? '1 step' : r.entryCount + ' steps',
                 otherRecord: !r.aboutThisRecord,
                 hasActedUnder: !!(r.agentVersion || r.policyReference),
@@ -162,7 +197,7 @@ export default class RecordAuditTrail extends LightningElement {
                     ...e,
                     icon: TYPE_ICONS[e.type] || 'utility:record',
                     summaryText: e.summary || e.typeLabel,
-                    captureClass: 'capture ' + (e.capturedByCode ? 'capture-code' : 'capture-agent'),
+                    captureClass: 'capture ' + (e.detected ? 'capture-detected' : e.capturedByCode ? 'capture-code' : 'capture-agent'),
                     isExpanded: this.expanded.has(e.entryId),
                     toggleLabel: this.expanded.has(e.entryId) ? 'Hide details' : 'Details',
                     hasFieldChanges: e.fieldChanges && e.fieldChanges.length > 0,

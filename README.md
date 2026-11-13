@@ -23,6 +23,8 @@ Open source (MIT), native to Salesforce, no external services.
 | **Recorded actions** | Get, Update and Create Record (AgentLedger): drop-in replacements for the standard record actions. The change and its log entry are written together, so the agent cannot change data without it being logged. |
 | **What the agent acted under** | Every run records the agent version, a fingerprint of its instructions (the full text is kept once per version) and the policy it acted under. |
 | **Modes** | Activity Log (default), Tamper-Evident, or Tamper-Evident + Anchored, set for the org and per agent. |
+| **Change detector** | Triggers on Account, Contact, Lead, Opportunity and Case log changes an agent makes without an AgentLedger action, such as through the standard Update Record action. They are marked "Detected: not logged by the agent". |
+| **Check history** | Compares a run with the field changes Salesforce recorded in Field History during it, and lists any the log does not have. |
 | **Export and verify anywhere** | Export downloads a run as JSON. Anyone can verify it outside Salesforce with `npx @vluthra/agent-ledger verify` or `python -m agentledger verify`. |
 | **Agent Activity page** | Recent runs across the org, filtered by status, integrity or agent. |
 | **Setup page** | Settings for the org and each agent, health, and the auto-close job, without Setup menus. |
@@ -54,9 +56,12 @@ job.
   stated reasoning is how the model actually decided: the reasoning is the
   agent's own explanation.
 - **Completeness depends on capture.** Changes made through the recorded actions
-  are always logged. Steps the agent only reports are logged when the agent
-  reports them. Removing the standard Update Record action from an agent closes
-  that gap for data changes.
+  are always logged, with the agent's reasoning. A change an agent makes through
+  any other action on Account, Contact, Lead, Opportunity or Case is still
+  logged by the change detector, marked as not logged by the agent. Steps the
+  agent only reports (decisions, recommendations) are logged when it reports
+  them. **Check history** compares a run with Salesforce's own Field History and
+  lists tracked changes the log does not have.
 - **Inside one org, a determined administrator** can deactivate triggers and
   rewrite records and fingerprints together. A copy exported earlier and kept
   outside the org shows such a rewrite; external anchoring (coming next) shows it

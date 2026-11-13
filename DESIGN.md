@@ -160,6 +160,12 @@ A trigger handler on watched objects. Triggers are compiled per object, so the
 package ships handlers for common standard objects (Account, Contact, Lead,
 Opportunity, Case) and the docs give a one-line trigger for any other object.
 
+Built (November 2026): `AgentLedgerChangeDetector` and triggers for the five
+objects. It acts only on `INVOCABLE_ACTION` requests that are not a recorded
+action (`AgentLedgerGuard.beginRecordedChange`). Checked in a live org: the
+agent's escalation through AgentLedger produced no duplicate; a Flow called
+through the Actions API was not flagged.
+
 ### 5.4 Reconciliation with independent histories (added after the CACM review)
 
 Cryptographic checks cannot find steps that were never recorded. As a check on
@@ -168,6 +174,10 @@ Data Change entries with Salesforce's own history (Field History Tracking or
 Shield Field Audit Trail) for watched objects, and lists changes made during a
 run that have no matching entry. Planned for Phase 2, next to the change
 detector.
+
+Built (November 2026): `AgentLedgerReconciliation`, the **Check history** button.
+Checked in a live org against CaseHistory: two agent runs reconciled completely;
+a Status change made directly during an open run was listed as not in the log.
 
 ### 5.5 Closing runs
 
@@ -348,7 +358,7 @@ afterwards.
 
 | # | Question | Result |
 | --- | --- | --- |
-| S1 | Can Apex tell that a transaction is running inside an agent run? | **Open.** `System.Quiddity` has no agent value. What a trigger sees during an agent's standard Update Record action was not captured (preview `-x` produced no Apex logs). Retest with a trace flag in Phase 2, before building the change detector. |
+| S1 | Can Apex tell that a transaction is running inside an agent run? | **Yes, by request type (November 2026).** A spy trigger on Case, with the agent driven by `sf agent preview start/send`: the agent's action ran with quiddity `INVOCABLE_ACTION` and no session Id; a person's change through the REST API, and a Flow called through the Actions REST API, ran as `SYNCHRONOUS`. All ran as the same user. Observed with an Apex action; a standard or Flow action run by the agent is expected to match (to confirm). |
 | S2 | Can an unlocked package contain `GenAiFunction`? | **Yes.** A package version containing one action installed and registered the action (`GenAiFunctionDefinition` present). Caveat: validated builds fail in a default build org ("not available for deploy"); a releasable version needs a build org with Agentforce, probably via org shape. |
 | S3 | Agent Script hooks; billing; access to the final response | `before_reasoning`/`after_reasoning` run once per turn, deterministically; `@system_variables.user_input` is available; the agent's reply is **not** exposed. Decisions are therefore captured by gating: business actions are `available when` a decision has been recorded, and `after_reasoning` logs "no decision recorded" otherwise. Billing not documented: measure in the org. |
 | S4 | Does a DateTime field keep milliseconds? | **No** (sent 123 ms, stored 0). `Timestamp_Text__c` is required. |

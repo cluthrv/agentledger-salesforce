@@ -60,6 +60,7 @@ public without sharing class AgentLedgerTimelineController {
         @AuraEnabled public String hash;
         @AuraEnabled public List<FieldChangeView> fieldChanges = new List<FieldChangeView>();
         @AuraEnabled public Integer hiddenFieldChanges = 0;
+        @AuraEnabled public Boolean detected = false;
     }
 
     public class FieldChangeView {
@@ -224,7 +225,9 @@ public without sharing class AgentLedgerTimelineController {
         v.outputResult = readableResult(e.Output_Result__c, fieldMap(e.Target_Object__c));
         v.capturedByCode = e.Capture_Method__c == 'Recorded_Action' || e.Capture_Method__c == 'Agent_Script'
             || e.Capture_Method__c == 'Change_Detector';
-        v.captureLabel = v.capturedByCode ? 'Recorded automatically' : 'Reported by the agent';
+        v.detected = e.Capture_Method__c == AgentLedgerChangeDetector.CAPTURE_METHOD;
+        v.captureLabel = v.detected ? 'Detected: not logged by the agent'
+            : v.capturedByCode ? 'Recorded automatically' : 'Reported by the agent';
         v.targetRecordId = e.Target_Record_Id__c;
         v.targetObject = e.Target_Object__c;
         v.targetsThisRecord = e.Target_Record_Id__c != null && idForms.contains(e.Target_Record_Id__c);

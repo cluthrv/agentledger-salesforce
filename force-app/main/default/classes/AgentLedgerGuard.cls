@@ -41,6 +41,7 @@ public with sharing class AgentLedgerGuard {
     };
 
     private static Integer ledgerWriteDepth = 0;
+    private static Integer recordedChangeDepth = 0;
 
     @TestVisible
     private static Boolean allowManualEditsForTest = false;
@@ -56,6 +57,23 @@ public with sharing class AgentLedgerGuard {
 
     public static Boolean isLedgerWrite() {
         return ledgerWriteDepth > 0;
+    }
+
+    /**
+     * Mark a business record change made by a recorded action, which logs it
+     * itself; the change detector skips it. Pair with endRecordedChange in a
+     * finally block.
+     */
+    public static void beginRecordedChange() {
+        recordedChangeDepth++;
+    }
+
+    public static void endRecordedChange() {
+        recordedChangeDepth = Math.max(0, recordedChangeDepth - 1);
+    }
+
+    public static Boolean isRecordedChange() {
+        return recordedChangeDepth > 0;
     }
 
     /** True when the running user may edit entries for testing. */

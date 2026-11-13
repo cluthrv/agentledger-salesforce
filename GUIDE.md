@@ -145,6 +145,41 @@ An hourly job closes runs with no activity for longer than the auto-close time
 **Incomplete**, so a missing close is visible. Turn it on or off, or run it now,
 on the Setup page.
 
+## Changes made outside AgentLedger
+
+**Change detector.** Triggers on Account, Contact, Lead, Opportunity and Case
+log a change an agent makes without an AgentLedger action (for example through
+the standard Update Record action or a Flow action). The entry goes into the
+user's open run for that record, or their most recent open run, or a new run for
+"Unidentified agent", and is labelled **Detected: not logged by the agent**:
+it has before and after values but no reasoning. In Tamper-Evident mode
+(roll back), a change the detector cannot log is refused.
+
+How it knows: an action run by an agent executes with the request type
+`INVOCABLE_ACTION`; a person's change through the UI or API, and a Flow called
+through the Actions API, do not. AgentLedger's own actions mark their changes, so
+they are not logged twice. Bulk changes log the first 20 records one by one and
+the rest in one entry.
+
+For another object, add a trigger:
+
+```apex
+trigger MyObjectAgentLedger on My_Object__c (after insert, after update, after delete) {
+    AgentLedgerChangeDetector.handle();
+}
+```
+
+The org default's **Watched objects** limits detection to the objects listed;
+empty means every object with a detector trigger.
+
+**Check history.** The **Check history** button on a run compares it with
+Salesforce's own Field History: the tracked field changes made by the run's user
+on the records it touched, while it ran. Each is looked up in the log; any the
+log does not have are listed. This does not rely on AgentLedger's capture. It
+covers fields with Field History Tracking turned on; objects without field
+history are named. A person's own edit during the run is listed too, for the
+reviewer to judge.
+
 ## Limits
 
 - **Entries per transaction:** each entry costs 2 SOQL queries, so about 45

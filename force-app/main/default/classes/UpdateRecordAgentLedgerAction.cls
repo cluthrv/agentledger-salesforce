@@ -84,7 +84,12 @@ public with sharing class UpdateRecordAgentLedgerAction {
             }
 
             before = AgentLedgerRecordSupport.readRecord(recordId, readFields);
-            Database.update(toUpdate, AccessLevel.USER_MODE);
+            AgentLedgerGuard.beginRecordedChange();
+            try {
+                Database.update(toUpdate, AccessLevel.USER_MODE);
+            } finally {
+                AgentLedgerGuard.endRecordedChange();
+            }
             SObject after = AgentLedgerRecordSupport.readRecord(recordId, readFields);
 
             for (Schema.DescribeFieldResult fd : fields) {

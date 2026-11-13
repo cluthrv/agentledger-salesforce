@@ -77,7 +77,12 @@ public with sharing class CreateRecordAgentLedgerAction {
                 record.put(fd.getName(), AgentLedgerRecordSupport.coerce(fd, values.get(key)));
                 fields.add(fd);
             }
-            Database.insert(record, AccessLevel.USER_MODE);
+            AgentLedgerGuard.beginRecordedChange();
+            try {
+                Database.insert(record, AccessLevel.USER_MODE);
+            } finally {
+                AgentLedgerGuard.endRecordedChange();
+            }
             Set<String> readFields = new Set<String>();
             for (Schema.DescribeFieldResult fd : fields) {
                 readFields.add(fd.getName());

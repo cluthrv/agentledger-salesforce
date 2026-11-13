@@ -55,6 +55,9 @@
                                 <lightning-button label="Verify" icon-name="utility:shield" data-run-id={run.runId}
                                     onclick={handleVerify} disabled={run.isVerifying}></lightning-button>
                             </template>
+                            <lightning-button label="Check history" icon-name="utility:record_lookup" data-run-id={run.runId}
+                                title="Compare this run with the field changes Salesforce recorded in Field History"
+                                onclick={handleReconcile} disabled={run.isReconciling}></lightning-button>
                             <template lwc:if={run.showExport}>
                                 <lightning-button label="Export" icon-name="utility:download" data-run-id={run.runId}
                                     title="Download this run to verify it outside Salesforce"
@@ -62,6 +65,23 @@
                             </template>
                         </lightning-button-group>
                     </div>
+
+                    <template lwc:if={run.reconcile}>
+                        <div class={run.reconcile.boxClass}>
+                            <p>{run.reconcile.summary}</p>
+                            <template lwc:if={run.reconcile.hasMissing}>
+                                <ul class="slds-list_dotted slds-m-top_xx-small">
+                                    <template for:each={run.reconcile.missing} for:item="m">
+                                        <li key={m.key}>
+                                            {m.objectName} {m.recordId}: <strong>{m.fieldLabel}</strong> {m.before} → {m.after},
+                                            <lightning-formatted-date-time value={m.changedAt} month="short" day="numeric"
+                                                hour="2-digit" minute="2-digit" second="2-digit"></lightning-formatted-date-time>
+                                        </li>
+                                    </template>
+                                </ul>
+                            </template>
+                        </div>
+                    </template>
 
                     <ol class="entries">
                         <template for:each={run.entries} for:item="entry">
