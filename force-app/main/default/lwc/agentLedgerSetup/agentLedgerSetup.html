@@ -143,7 +143,7 @@
                                     Update or Create Record actions, change them to the AgentLedger ones. Save these
                                     settings too, so the Agent Id below is recognised.
                                 </p>
-                                <textarea class="instructions" readonly rows="16" value={agentInstructionText}></textarea>
+                                <textarea class="instructions" readonly rows="16" lwc:dom="manual"></textarea>
                                 <lightning-button label="Copy instructions" icon-name="utility:copy"
                                     onclick={handleCopyInstructions} class="slds-m-top_x-small"></lightning-button>
                             </div>

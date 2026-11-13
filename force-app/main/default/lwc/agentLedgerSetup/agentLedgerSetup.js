@@ -148,6 +148,14 @@ export default class AgentLedgerSetup extends LightningElement {
         this.agentForm = { ...this.agentForm, [field]: value };
     }
 
+    renderedCallback() {
+        // A native textarea shows its value property, which templates cannot bind.
+        const box = this.template.querySelector('textarea.instructions');
+        if (box && box.value !== this.agentInstructionText) {
+            box.value = this.agentInstructionText;
+        }
+    }
+
     /** The instruction to add to the agent, from the values in the form (saved or not). */
     get agentInstructionText() {
         return this.agentForm
