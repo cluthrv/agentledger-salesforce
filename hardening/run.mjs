@@ -263,6 +263,39 @@ out('run.conc', [SELECT Name FROM Agent_Audit_Session__c WHERE Id = :runId].Name
 
 
 
+// The change detector in a real org: a person's own change, made while an
+// agent's run is open, is not flagged (only an agent's action runs as
+// INVOCABLE_ACTION; the agent side is HardeningDetectorTest). Then Check
+// history against real Field History, which is written when the transaction
+// commits, so the check runs in a second transaction.
+const DETECTOR = `
+Integer detectedBefore = [SELECT COUNT() FROM Agent_Audit_Record__c WHERE Capture_Method__c = 'Change_Detector'];
+Case c = new Case(Subject = 'Person edit', Status = 'New', Origin = 'Web');
+insert c;
+UpdateRecordAgentLedgerAction.Result caseRun = upd('HardenTE', c.Id, '{"Priority": "High"}', null, 'agent sets priority');
+update new Case(Id = c.Id, Status = 'Working');
+delete new Case(Id = c.Id);
+check('detector.caseRunHasOnlyTheAgentEntry', entries(caseRun.sessionId) == 1, entries(caseRun.sessionId));
+AgentAuditRecorder.sealSession(caseRun.sessionId);
+Hardening_Item__c item = new Hardening_Item__c(Name = 'Reconcile item', Amount__c = 5, Status__c = 'New');
+insert item;
+UpdateRecordAgentLedgerAction.Result r = upd('HardenTE', item.Id, '{"Status__c": "Recorded"}', null, 'agent sets status');
+update new Hardening_Item__c(Id = item.Id, Amount__c = 7);
+check('detector.peopleNotFlagged', [SELECT COUNT() FROM Agent_Audit_Record__c WHERE Capture_Method__c = 'Change_Detector'] == detectedBefore, 'no detected entries for changes made by a person');
+check('detector.runUnchanged', entries(r.sessionId) == 1, entries(r.sessionId));
+out('recon.run', r.sessionId);
+`;
+const RECONCILE = `
+Id runId = '{{RUN}}';
+AgentLedgerReconciliation.Result open = AgentLedgerReconciliation.reconcileRun(runId);
+check('reconcile.open', open.historyChanges == 2 && open.matched == 1 && open.missing.size() == 1, open.summary);
+check('reconcile.missingIsTheDirectEdit', !open.missing.isEmpty() && open.missing[0].field == 'Amount__c' && String.valueOf(open.missing[0].after).startsWith('7'), open.missing);
+AgentAuditRecorder.sealSession(runId);
+AgentLedgerReconciliation.Result sealed = AgentLedgerReconciliation.reconcileRun(runId);
+check('reconcile.sealed', sealed.matched == 1 && sealed.missing.size() == 1, sealed.summary);
+check('reconcile.verifies', AgentAuditRecorder.verifySession(runId).valid == true, 'a run with a gap still verifies: the gap is reported, not hidden');
+`;
+
 // ── Run ──
 
 const t0 = Date.now();
@@ -292,7 +325,12 @@ await Promise.all(Array.from({ length: WRITERS }, (_, w) =>
   apex('concurrency', ADMIN, CONC_ADD, { RUN: outputs['conc.run'], ITEM: outputs['conc.item'], K: PER, W: w })));
 await apex('concurrency', ADMIN, CONC_END, { RUN: outputs['conc.run'], TOTAL: 1 + WRITERS * PER });
 }
-if (want('access')) {
+if (want('detector')) {
+console.log('Change detector and Check history...');
+await apex('detector', ADMIN, DETECTOR);
+if (outputs['recon.run']) await apex('detector', ADMIN, RECONCILE, { RUN: outputs['recon.run'] });
+}
+if (want('access') || want('agent') || want('detector')) {
 // Standard and Platform users cannot run anonymous Apex: these scenarios are
 // Apex tests that impersonate the viewer and the agent user (System.runAs).
 async function impersonating(scenario, testClass) {
@@ -311,6 +349,7 @@ async function impersonating(scenario, testClass) {
 console.log('Access and agent user...');
 if (want('access')) await impersonating('access', 'HardeningViewerTest');
 if (want('agent')) await impersonating('agent', 'HardeningAgentUserTest');
+if (want('detector')) await impersonating('detector', 'HardeningDetectorTest');
 
 }
 // ── Report ──

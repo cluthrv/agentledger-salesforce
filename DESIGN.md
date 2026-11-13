@@ -254,7 +254,7 @@ that the Python verifier rejected action types outside its enum ("Query",
 ### 6.6 Hardening (November 2026)
 
 `hardening/` installs the package in a clean org and exercises it as an admin,
-a viewer and an agent user (75 checks). Findings:
+a viewer and an agent user (87 checks on 0.1.0-4, upgraded from 0.1.0-3). Findings:
 
 - **An upgrade reset the org's settings.** The package shipped the
   `Org_Default` custom metadata record, and installing a new version
@@ -271,6 +271,15 @@ a viewer and an agent user (75 checks). Findings:
   record they cannot read; values of a field they cannot read appear nowhere;
   an agent user cannot read or change records outside its own access, and
   refused attempts leave no entries.
+- **Change detector and Check history in an installed org:** a person's own
+  edit and delete during an agent's open run are not flagged; an agent's change
+  outside AgentLedger (simulated through the detector's test hook, since only a
+  real agent produces `INVOCABLE_ACTION`) is logged in its open run or as an
+  unidentified agent, refused in a tamper-evident run if it cannot be logged,
+  and bulk inserts log 20 entries plus one summary. An object added with its
+  own detector trigger works as documented. Check history against real Field
+  History lists a direct edit made during a run, open or sealed, and the run
+  still verifies.
 - Standard and Platform users cannot run anonymous Apex, so the user scenarios
   are Apex tests that impersonate the users.
 

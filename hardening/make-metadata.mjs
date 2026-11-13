@@ -90,6 +90,21 @@ put('triggers/HardeningLogFailure.trigger-meta.xml', `
 </ApexTrigger>
 `);
 
+// Watches the test object for changes made outside AgentLedger: the documented
+// way to add an object to the change detector.
+put('triggers/HardeningItemDetector.trigger', `
+trigger HardeningItemDetector on Hardening_Item__c (after insert, after update, after delete) {
+    AgentLedgerChangeDetector.handle();
+}
+`);
+put('triggers/HardeningItemDetector.trigger-meta.xml', `
+<?xml version="1.0" encoding="UTF-8"?>
+<ApexTrigger ${NS}>
+    <apiVersion>65.0</apiVersion>
+    <status>Active</status>
+</ApexTrigger>
+`);
+
 // One agent setting per mode under test.
 const setting = (dev, label, values) => put(`customMetadata/AgentLedger_Setting.${dev}.md-meta.xml`, `
 <?xml version="1.0" encoding="UTF-8"?>
