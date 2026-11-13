@@ -15,7 +15,7 @@
             <template for:each={runs} for:item="run">
                 <section key={run.runId} class="run">
                     <div class="run-header">
-                        <div>
+                        <div class="run-info">
                             <div class="run-title">
                                 <span class="agent">{run.agent}</span>
                                 <span class={run.statusClass}>{run.status}</span>
@@ -50,7 +50,7 @@
                                 </div>
                             </template>
                         </div>
-                        <lightning-button-group>
+                        <lightning-button-group class="run-actions">
                             <template lwc:if={run.showVerify}>
                                 <lightning-button label="Verify" icon-name="utility:shield" data-run-id={run.runId}
                                     onclick={handleVerify} disabled={run.isVerifying}></lightning-button>
