@@ -68,6 +68,7 @@ public without sharing class AgentLedgerTimelineController {
         @AuraEnabled public String label;
         @AuraEnabled public String before;
         @AuraEnabled public String after;
+        @AuraEnabled public Boolean automatic = false;
     }
 
     /**
@@ -269,6 +270,7 @@ public without sharing class AgentLedgerTimelineController {
             fc.label = (String) c.get('label');
             fc.before = (String) c.get('before');
             fc.after = (String) c.get('after');
+            fc.automatic = c.get('automatic') == true;
             v.fieldChanges.add(fc);
         }
     }

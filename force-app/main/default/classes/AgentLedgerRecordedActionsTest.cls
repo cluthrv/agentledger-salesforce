@@ -117,6 +117,43 @@ private class AgentLedgerRecordedActionsTest {
     }
 
     @isTest
+    static void knockOnChangesAreLoggedAsAutomatic() {
+        settings('Tamper_Evident', null);
+        // Moving the Stage resets Probability to the new stage's default.
+        Opportunity o = new Opportunity(Name = 'Knock-on', StageName = 'Prospecting', Probability = 22,
+                                        Amount = 50000, CloseDate = Date.today().addDays(30));
+        insert o;
+
+        UpdateRecordAgentLedgerAction.Request req = new UpdateRecordAgentLedgerAction.Request();
+        req.recordId = o.Id;
+        req.fieldValues = '{"StageName": "Needs Analysis"}';
+        req.reasoning = 'All three criteria passed.';
+        req.agentId = AGENT;
+        UpdateRecordAgentLedgerAction.Result res = UpdateRecordAgentLedgerAction.execute(
+            new List<UpdateRecordAgentLedgerAction.Request>{ req })[0];
+        System.assert(res.success, res.errorMessage);
+
+        Decimal probability = [SELECT Probability FROM Opportunity WHERE Id = :o.Id].Probability;
+        Agent_Audit_Record__c entry = [SELECT Field_Changes__c FROM Agent_Audit_Record__c WHERE Audit_Session__c = :res.sessionId];
+        Map<String, Map<String, Object>> byField = new Map<String, Map<String, Object>>();
+        for (Object c : (List<Object>) System.JSON.deserializeUntyped(entry.Field_Changes__c)) {
+            Map<String, Object> m = (Map<String, Object>) c;
+            byField.put((String) m.get('field'), m);
+        }
+        System.assertEquals(null, byField.get('StageName').get('automatic'), 'the requested change is not automatic');
+        if (probability != 22) {
+            System.assertEquals(true, byField.get('Probability').get('automatic'), entry.Field_Changes__c);
+            System.assert(res.changes.contains('(set automatically)'), res.changes);
+        } else {
+            System.assert(!byField.containsKey('Probability'), 'an unchanged field is not logged');
+        }
+        System.assert(!byField.containsKey('LastModifiedDate') && !byField.containsKey('SystemModstamp'), entry.Field_Changes__c);
+
+        AgentAuditRecorder.sealSession(res.sessionId);
+        System.assert(AgentAuditRecorder.verifySession(res.sessionId).valid);
+    }
+
+    @isTest
     static void noChangeIsStillLogged() {
         settings('Activity_Log', null);
         Case c = newCase();

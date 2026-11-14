@@ -203,7 +203,7 @@ export default class RecordAuditTrail extends LightningElement {
                     hasFieldChanges: e.fieldChanges && e.fieldChanges.length > 0,
                     fieldChangeRows: (e.fieldChanges || []).map((c, i) => ({
                         key: e.entryId + '-' + i,
-                        label: c.label || c.field,
+                        label: (c.label || c.field) + (c.automatic ? ' (set automatically)' : ''),
                         before: c.before == null ? '(blank)' : c.before,
                         after: c.after == null ? '(blank)' : c.after
                     })),

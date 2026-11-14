@@ -19,6 +19,53 @@ public with sharing class AgentLedgerRecordSupport {
         public String label;
         public String before;
         public String after;
+        /** True when the field changed as a knock-on effect, not because it was asked for. */
+        public Boolean automatic;
+    }
+
+    private static final Set<String> SYSTEM_FIELDS = new Set<String>{
+        'id', 'createddate', 'createdbyid', 'lastmodifieddate', 'lastmodifiedbyid', 'systemmodstamp',
+        'lastvieweddate', 'lastreferenceddate', 'lastactivitydate', 'isdeleted'
+    };
+
+    /**
+     * The fields of an object, other than those named, that a change could set
+     * and the running user can read: not formulas, auto-numbers, compound
+     * fields, system fields or fields only Salesforce maintains.
+     */
+    public static List<Schema.DescribeFieldResult> otherSettableFields(Schema.DescribeSObjectResult d, Set<String> exclude) {
+        Set<String> skip = new Set<String>();
+        for (String s : exclude) {
+            skip.add(s.toLowerCase());
+        }
+        List<Schema.DescribeFieldResult> out = new List<Schema.DescribeFieldResult>();
+        for (Schema.SObjectField f : d.fields.getMap().values()) {
+            Schema.DescribeFieldResult fd = f.getDescribe();
+            String name = fd.getName().toLowerCase();
+            if (skip.contains(name) || SYSTEM_FIELDS.contains(name) || !fd.isAccessible()
+                    || fd.isCalculated() || fd.isAutoNumber()
+                    || fd.getType() == Schema.DisplayType.ADDRESS || fd.getType() == Schema.DisplayType.LOCATION
+                    || (!fd.isCreateable() && !fd.isUpdateable() && !fd.isPermissionable())) {
+                continue;
+            }
+            out.add(fd);
+        }
+        return out;
+    }
+
+    /** The changes as stored in Field_Changes__c; "automatic" appears only on knock-on changes. */
+    public static String serializeChanges(List<FieldChange> changes) {
+        List<Object> out = new List<Object>();
+        for (FieldChange c : changes) {
+            Map<String, Object> m = new Map<String, Object>{
+                'field' => c.field, 'label' => c.label, 'before' => c.before, 'after' => c.after
+            };
+            if (c.automatic == true) {
+                m.put('automatic', true);
+            }
+            out.add(m);
+        }
+        return System.JSON.serialize(out);
     }
 
     /** Field values from the JSON object the agent passes, e.g. {"Status":"Escalated"}. */
@@ -211,7 +258,8 @@ public with sharing class AgentLedgerRecordSupport {
     public static String describeChanges(List<FieldChange> changes) {
         List<String> parts = new List<String>();
         for (FieldChange c : changes) {
-            parts.add(c.label + ': ' + (c.before == null ? '(blank)' : c.before) + ' → ' + (c.after == null ? '(blank)' : c.after));
+            parts.add(c.label + ': ' + (c.before == null ? '(blank)' : c.before) + ' → ' + (c.after == null ? '(blank)' : c.after)
+                + (c.automatic == true ? ' (set automatically)' : ''));
         }
         return String.join(parts, '; ');
     }

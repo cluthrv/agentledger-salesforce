@@ -5,6 +5,9 @@
  * logs the change, with before and after values, in the same transaction. The
  * agent cannot make the change without it being logged.
  *
+ * Fields the update changes as a knock-on effect (an Opportunity's Probability
+ * following its Stage, or a flow or trigger) are logged too, marked automatic.
+ *
  * The update runs with the running user's permissions (object, field and
  * record access). If the log entry cannot be written, the change is rolled
  * back or kept according to the agent's "If Logging Fails" setting
@@ -82,6 +85,12 @@ public with sharing class UpdateRecordAgentLedgerAction {
             if (nameField != null) {
                 readFields.add(nameField);
             }
+            // Every other field the update could change as a knock-on effect
+            // (stage defaults, flows, triggers), so those changes are logged too.
+            List<Schema.DescribeFieldResult> others = AgentLedgerRecordSupport.otherSettableFields(d, readFields);
+            for (Schema.DescribeFieldResult fd : others) {
+                readFields.add(fd.getName());
+            }
 
             before = AgentLedgerRecordSupport.readRecord(recordId, readFields);
             AgentLedgerGuard.beginRecordedChange();
@@ -97,6 +106,15 @@ public with sharing class UpdateRecordAgentLedgerAction {
                 Object a = after.get(fd.getName());
                 if (b != a) {
                     changes.add(AgentLedgerRecordSupport.change(settings, d.getName(), fd, b, a));
+                }
+            }
+            for (Schema.DescribeFieldResult fd : others) {
+                Object b = before.get(fd.getName());
+                Object a = after.get(fd.getName());
+                if (b != a) {
+                    AgentLedgerRecordSupport.FieldChange c = AgentLedgerRecordSupport.change(settings, d.getName(), fd, b, a);
+                    c.automatic = true;
+                    changes.add(c);
                 }
             }
             res.changes = changes.isEmpty()
@@ -125,7 +143,7 @@ public with sharing class UpdateRecordAgentLedgerAction {
             entry.targetObject = d.getName();
             entry.inputContext = 'Requested: ' + req.fieldValues;
             entry.outputResult = res.changes;
-            entry.fieldChanges = System.JSON.serialize(changes);
+            entry.fieldChanges = AgentLedgerRecordSupport.serializeChanges(changes);
             String name = AgentLedgerRecordSupport.displayName(before, d);
             entry.summary = AgentLedgerRecordSupport.fit(String.isNotBlank(req.summary)
                 ? req.summary

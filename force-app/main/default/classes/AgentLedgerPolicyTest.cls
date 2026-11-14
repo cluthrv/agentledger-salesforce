@@ -137,6 +137,25 @@ private class AgentLedgerPolicyTest {
     }
 
     @isTest
+    static void newBuilderAgentsSayWhatTheirSnapshotCovers() {
+        Id plannerId = Id.valueOf('16jAq000000b1OXIAY');
+        System.assert(AgentLedgerPolicy.isAgentScript(plannerId,
+            new List<String>{ 'agent_router_16jAq000000b1OX', 'Opportunity_Qualification_16jAq000000b1OX' }));
+        System.assert(!AgentLedgerPolicy.isAgentScript(plannerId, new List<String>{ 'CaseEscalation', 'GeneralFAQ' }));
+        System.assert(!AgentLedgerPolicy.isAgentScript(plannerId, new List<String>{ 'agent_router_16jAq000000b1Mv' }),
+            'subagents of another version do not count');
+
+        List<Map<String, Object>> subs = new List<Map<String, Object>>{
+            AgentLedgerPolicy.subagent('GeneralFAQ', 'General FAQ', null, null, null)
+        };
+        AgentLedgerPolicy.AgentDefinition partial = AgentLedgerPolicy.buildDefinition(AGENT, AGENT + ' v2 (Active)', subs,
+            AgentLedgerPolicy.AGENT_SCRIPT_COVERAGE);
+        System.assert(partial.content.contains('"coverage":"Agent-level instructions and subagent descriptions only.'), partial.content);
+        System.assert(!AgentLedgerPolicy.buildDefinition(AGENT, AGENT + ' v2 (Active)', subs).content.contains('coverage'),
+            'documents of agents built in the classic builder are unchanged');
+    }
+
+    @isTest
     static void snapshotsCannotBeChangedOrDeleted() {
         useAgent('CaseEscalationAgent v3 (Active)', 'Escalate when Priority is High.', null, null);
         AgentAuditRecorder.startSession('case-escalation-agent', CASE_ID, 'agentforce');

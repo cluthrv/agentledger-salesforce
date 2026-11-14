@@ -87,12 +87,62 @@ public inherited sharing class AgentLedgerPolicy {
         return def;
     }
 
+    /** The agent's active version, or its highest-numbered one if none is active. */
+    private static Id activeVersionId(String agentName) {
+        List<BotVersion> versions = [
+            SELECT Id, Status FROM BotVersion
+            WHERE BotDefinition.DeveloperName = :agentName
+            ORDER BY VersionNumber DESC
+        ];
+        for (BotVersion v : versions) {
+            if (v.Status == 'Active') {
+                return v.Id;
+            }
+        }
+        return versions.isEmpty() ? null : versions[0].Id;
+    }
+
+    /**
+     * Whether the agent was built in the new Agentforce Builder. Its subagents
+     * are named after the planner (e.g. Opportunity_Qualification_16jAq000000b1OX),
+     * and their reasoning instructions live in the agent's script, which Apex
+     * cannot read: only agent-level instructions and subagent descriptions are.
+     */
+    @TestVisible
+    private static Boolean isAgentScript(Id plannerId, List<String> subagentNames) {
+        String suffix = '_' + String.valueOf(plannerId).left(15);
+        for (String n : subagentNames) {
+            if (n != null && n.endsWith(suffix)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** The agent's version and its subagents' instructions as canonical JSON, or null if no such agent. */
     private static AgentDefinition readDefinition(String agentName) {
         List<GenAiPlannerDefinition> planners = [
             SELECT Id, DeveloperName, LinkedBotVersionId
             FROM GenAiPlannerDefinition WHERE DeveloperName = :agentName LIMIT 1
         ];
+        if (planners.isEmpty()) {
+            // Agents built in the new Agentforce Builder (Agent Script) have one
+            // planner per version, named <agent>_v<n>: use the active version's.
+            Id versionId = activeVersionId(agentName);
+            if (versionId != null) {
+                // LinkedBotVersionId cannot be filtered on in a query.
+                String prefix = agentName + '_v%';
+                for (GenAiPlannerDefinition p : [
+                    SELECT Id, DeveloperName, LinkedBotVersionId
+                    FROM GenAiPlannerDefinition WHERE DeveloperName LIKE :prefix
+                ]) {
+                    if (p.LinkedBotVersionId == versionId) {
+                        planners.add(p);
+                        break;
+                    }
+                }
+            }
+        }
         if (planners.isEmpty()) {
             return null;
         }
@@ -142,7 +192,9 @@ public inherited sharing class AgentLedgerPolicy {
         }
 
         List<Map<String, Object>> subagents = new List<Map<String, Object>>();
+        List<String> names = new List<String>();
         for (SObject p : plugins) {
+            names.add((String) p.get('DeveloperName'));
             subagents.add(subagent(
                 (String) p.get('DeveloperName'),
                 (String) p.get('MasterLabel'),
@@ -150,8 +202,16 @@ public inherited sharing class AgentLedgerPolicy {
                 hasScope ? (String) p.get('Scope') : null,
                 instructionsByPlugin.get((Id) p.get('Id'))));
         }
-        return buildDefinition(agentName, version, subagents);
+        AgentDefinition def = buildDefinition(agentName, version, subagents,
+            isAgentScript(planner.Id, names) ? AGENT_SCRIPT_COVERAGE : null);
+        return def;
     }
+
+    /** Stated in the snapshot of a new-builder agent, so it never claims more than it holds. */
+    public static final String AGENT_SCRIPT_COVERAGE =
+        'Agent-level instructions and subagent descriptions only. This agent was built in the new '
+        + 'Agentforce Builder, which keeps subagent reasoning instructions in the agent script; read '
+        + 'them in that version of the agent in Agentforce Builder.';
 
     /** One subagent as it appears in the instructions document. */
     @TestVisible
@@ -173,14 +233,24 @@ public inherited sharing class AgentLedgerPolicy {
     /** The instructions document for an agent version: canonical JSON, so its hash is stable. */
     @TestVisible
     private static AgentDefinition buildDefinition(String agentName, String version, List<Map<String, Object>> subagents) {
+        return buildDefinition(agentName, version, subagents, null);
+    }
+
+    /** As above, with a statement of what the document covers when it is not everything. */
+    @TestVisible
+    private static AgentDefinition buildDefinition(String agentName, String version, List<Map<String, Object>> subagents, String coverage) {
         AgentDefinition def = new AgentDefinition();
         def.agentName = agentName;
         def.version = version;
-        def.content = AgentLedgerCanonical.serialize(new Map<String, Object>{
+        Map<String, Object> doc = new Map<String, Object>{
             'agent' => agentName,
             'version' => version,
             'subagents' => subagents
-        });
+        };
+        if (coverage != null) {
+            doc.put('coverage', coverage);
+        }
+        def.content = AgentLedgerCanonical.serialize(doc);
         return def;
     }
 
