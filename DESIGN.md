@@ -257,7 +257,8 @@ that the Python verifier rejected action types outside its enum ("Query",
 ### 6.6 Hardening (November 2026)
 
 `hardening/` installs the package in a clean org and exercises it as an admin,
-a viewer and an agent user (87 checks on 0.1.0-5, upgraded from 0.1.0-3 through 0.1.0-4). Findings:
+a viewer and an agent user (87 checks, passing on every version from 0.1.0-4
+to 0.1.0-8; the first run upgraded from 0.1.0-3). Findings:
 
 - **An upgrade reset the org's settings.** The package shipped the
   `Org_Default` custom metadata record, and installing a new version
@@ -285,6 +286,27 @@ a viewer and an agent user (87 checks on 0.1.0-5, upgraded from 0.1.0-3 through 
   still verifies.
 - Standard and Platform users cannot run anonymous Apex, so the user scenarios
   are Apex tests that impersonate the users.
+- **Customer install with the new Agentforce Builder** (0.1.0-7, a fresh org,
+  an Opportunity Qualification agent built from scratch in the new builder,
+  which is based on Agent Script):
+  - The agent appears only after **Commit Version**; **Save** keeps a draft.
+    The Setup page now says so.
+  - The new builder makes one planner per version, named `<agent>_v<n>`, so
+    the agent version and instructions were not captured. 0.1.0-8 finds the
+    planner through the agent's active version.
+  - Subagent reasoning instructions live in the agent's script, which Apex
+    cannot read (only the Metadata API can). The snapshot holds what is
+    readable and states its coverage; the recorded version identifies the
+    locked version in Builder.
+  - Moving the Stage reset Probability to the stage default without a log
+    entry. 0.1.0-8 logs every field an update changes, marking knock-on
+    changes as automatic.
+  - The new builder has no separate instruction box; the AgentLedger
+    instructions are appended to the subagent's Reasoning Instructions, one
+    line per rule so the rich-text editor keeps each rule together.
+  - The log also showed the agent contradicting itself (a timeline check
+    reported as failed, then "all three criteria passed"), which is the kind
+    of inconsistency the log exists to surface.
 
 ## 7. Anchoring
 
@@ -358,8 +380,9 @@ will offer to pause and resume auto-close around upgrades.
   listing later.
 - Action registrations: inside the package (Spike S2 confirmed unlocked
   packages can carry `GenAiFunction`), built in an Agentforce-shaped build org.
-  Fallback until that build works: one documented deploy command, with the
-  `.forceignore` bug fixed.
+  Beta versions are built with code coverage (latest 0.1.0-8); promoting a
+  released version, which production orgs need, is the next packaging step.
+  Installing from source with `scripts/deploy.mjs` remains for development.
 - First open of the AgentLedger app shows the setup checklist.
 - Install tested on a fresh Agentforce Developer Edition org before each release.
 

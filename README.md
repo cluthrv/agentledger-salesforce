@@ -20,8 +20,8 @@ Open source (MIT), native to Salesforce, no external services.
 | | |
 | --- | --- |
 | **Activity timeline** | A component for any record page: each agent run, its steps in plain language, field changes with before and after values, and whether each step was recorded automatically or reported by the agent. |
-| **Recorded actions** | Get, Update and Create Record (AgentLedger): drop-in replacements for the standard record actions. The change and its log entry are written together, so the agent cannot change data without it being logged. |
-| **What the agent acted under** | Every run records the agent version, a fingerprint of its instructions (the full text is kept once per version) and the policy it acted under. |
+| **Recorded actions** | Get, Update and Create Record (AgentLedger): drop-in replacements for the standard record actions. The change and its log entry are written together, so the agent cannot change data without it being logged. Fields the change sets as a knock-on effect (a stage's default Probability, a flow or trigger) are logged too, marked as set automatically. |
+| **What the agent acted under** | Every run records the agent version, a fingerprint of its instructions (the full text is kept once per version) and the policy it acted under. For agents built in the new Agentforce Builder, the captured instructions are the agent-level instructions and subagent descriptions; subagent reasoning instructions are read in that agent version in Builder. |
 | **Modes** | Activity Log (default), Tamper-Evident, or Tamper-Evident + Anchored, set for the org and per agent. |
 | **Change detector** | Triggers on Account, Contact, Lead, Opportunity and Case log changes an agent makes without an AgentLedger action, such as through the standard Update Record action. They are marked "Detected: not logged by the agent". |
 | **Check history** | Compares a run with the field changes Salesforce recorded in Field History during it, and lists any the log does not have. |
@@ -69,7 +69,21 @@ job.
 
 ## Install
 
-Requires Agentforce in the org and the Salesforce CLI.
+Requires Agentforce in the org.
+
+**Package.** Install the latest version, 0.1.0-8, from this link (for a
+sandbox, use `test.salesforce.com` instead of `login.salesforce.com`), and choose
+**Install for Admins Only**:
+
+```text
+https://login.salesforce.com/packaging/installPackage.apexp?p0=04tgK000000a3yfQAA
+```
+
+This is a beta version: Salesforce installs it in sandboxes, scratch orgs and
+Developer Edition orgs, not in production, until a released version is
+promoted.
+
+**From source** (Salesforce CLI):
 
 ```bash
 git clone https://github.com/cluthrv/agentledger-salesforce
@@ -89,10 +103,10 @@ Then, in the org:
 3. **Open the AgentLedger app** (App Launcher → AgentLedger) → **AgentLedger
    Setup**: choose the default mode, then **Edit** each agent to set its mode and
    policy. Auto-close starts on its own the first time you turn it on.
-4. **Give your agents the AgentLedger actions** and instructions: see
-   [GUIDE.md](GUIDE.md#connect-an-agent).
-
-An unlocked package for one-click install will follow.
+4. **Give your agents the AgentLedger actions**, then paste the instructions the
+   Setup page gives you for each agent (**Edit** → **Copy instructions**) into
+   its subagent. Works for agents in the classic builder and the new Agentforce
+   Builder: see [GUIDE.md](GUIDE.md#connect-an-agent).
 
 **Upgrading:** settings are kept: the package does not ship the org default
 record, which the Setup page creates on its first save. Salesforce does not

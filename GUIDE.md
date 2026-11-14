@@ -7,14 +7,21 @@ How to connect an agent, what AgentLedger stores, and how it works.
 ### 1. Use the agent's API name as its Agent Id
 
 Every AgentLedger action takes an **Agent Id**. Use the agent's API name (for
-example `CaseEscalationAgent`, shown on the Setup page). AgentLedger then finds
-the agent's definition and records its version and instructions on every run.
-If you use another value, set **Agentforce Agent** for it on the Setup page.
+example `CaseEscalationAgent`, shown on the Setup page); the instructions the
+Setup page gives you already do. AgentLedger then finds the agent's definition
+and records its version and instructions on every run. If an agent uses another
+value, set **Agentforce Agent** for it on the Setup page.
+
+An agent appears on the Setup page once it has been saved as an agent version.
+In the new Agentforce Builder, that happens when you click **Commit Version**;
+**Save** alone keeps a draft.
 
 ### 2. Give the agent the AgentLedger actions
 
-In Agentforce Builder, open the agent's subagent → **Actions** → **New → Add
-from Asset Library**:
+Add them to the subagent that does the work, not to the Agent Router. In the
+classic builder: the subagent → **Actions** → **New → Add from Asset Library**.
+In the new Agentforce Builder: the subagent → **+** → **Add Action for
+Reasoning**.
 
 | Add | Instead of | Why |
 | --- | --- | --- |
@@ -28,37 +35,67 @@ from Asset Library**:
 standard Update Record action is available, the agent can change data without
 logging it.
 
-Agents must be deactivated to be edited; activate them again afterwards.
+Custom actions (flows, Apex) can stay: AgentLedger works alongside them, and the
+change detector logs the changes they make on watched objects.
 
-### 3. Instructions
+**Editing a live agent.** Classic builder: deactivate the agent, edit, activate
+it again. New Agentforce Builder: click **New Version**, edit, then **Commit
+Version** and activate that version.
 
-Example for a case escalation subagent:
+### 3. Settings and instructions
+
+On **AgentLedger Setup → Agents → Edit**: whether to record the agent, its mode,
+what to do if a change cannot be logged, and its policy reference and policy
+text. Click **Save agent settings**.
+
+The panel then shows **Instructions for this agent**, built from those settings.
+Click **Copy instructions** and add them to the subagent, next to its own
+instructions:
+
+- **Classic builder:** as a separate instruction (**Add Instruction**).
+- **New Agentforce Builder:** at the end of the subagent's **Reasoning
+  Instructions**.
+
+Leave the agent's business instructions as they are. The AgentLedger
+instructions only say which actions to use and what to record, so the same
+block works for any agent. For a case escalation agent with a policy set, they
+read:
 
 ```text
-This agent keeps an AgentLedger activity log. Use Agent Id "CaseEscalationAgent" in every AgentLedger action.
-
-1. Read the Case with "Get Record (AgentLedger)": the Case Id, and Fields "Subject, Status, Priority".
-2. Decide: the Case qualifies for escalation if Priority is High and Status is not Escalated.
-   Record your decision with "Record Agent Action": Action Type "Decision", Related Record Id = the Case Id,
-   the decision in Output Result, and why in Reasoning. If a rule of the escalation policy applied,
-   name it in Policy Reference.
-3. If it qualifies, ask the user to confirm. If they confirm, change it ONLY with "Update Record (AgentLedger)":
-   the Case Id, Field Values {"Status": "Escalated"}, and your reasoning.
-4. Before you finish, call "Seal AgentLedger Session" with the Session Id returned by the AgentLedger actions.
+AgentLedger activity log. Follow these rules in addition to your other instructions. Use Agent Id "CaseEscalationAgent" in every AgentLedger action, and pass the Session Id returned by the first AgentLedger action to every later AgentLedger action.
+- To read a record, use "Get Record (AgentLedger)".
+- To change a record, use ONLY "Update Record (AgentLedger)"; to create one, use ONLY "Create Record (AgentLedger)". Always include your reasoning.
+- Whenever you check a rule or criterion, call "Record Agent Action" with Action Type "Validation": the result and the actual value in Output Result, why in Reasoning, and the record's Id as Related Record Id.
+- When you reach a decision or recommendation, call "Record Agent Action" with Action Type "Decision" or "Recommendation": the outcome in Output Result and why in Reasoning. Put "Case Escalation Policy v1" in Policy Reference.
+- When you hand off to a person or escalate, call "Record Agent Action" with Action Type "Escalation" saying to whom and why.
+- When you have finished the task, call "Seal AgentLedger Session" before your final reply.
 ```
-
-The same pattern works for any object: read with Get Record, record the
-decision, change with Update or Create Record.
 
 **Action types** for Record Agent Action: Recommendation, Decision,
 Human_Response, Query, Validation, Calculation, Create, Update, Data_Change,
 Escalation, Tool_Call, Delete, Error.
 
-### 4. Settings for the agent
+Start in **Activity Log** mode: it logs everything and never blocks the agent.
+Switch to **Tamper-Evident** once the agent's runs look right.
 
-On **AgentLedger Setup → Agents → Edit**: whether to record the agent, its mode,
-what to do if a change cannot be logged, and its policy reference and policy
-text.
+### 4. Check that it works
+
+Run the agent in Builder's preview on a test record, then open the record:
+
+- The **AgentLedger Activity** card shows a run under the agent's API name,
+  with lookups and changes marked **Recorded automatically** and decisions marked
+  as reported by the agent.
+- A change you make yourself to the record adds nothing.
+- The run is listed on the **Agent Activity** tab, and **Health** on the Setup
+  page shows no warnings.
+
+| Symptom | Cause |
+| --- | --- |
+| The agent is not on the Setup page | New Agentforce Builder: the version was saved but not committed. Commit it and refresh. |
+| Runs show "Unidentified agent" | The agent changed a record without the AgentLedger actions: remove the standard Update Record action, check the instructions are pasted. |
+| The run is under a different Agent Id | Set **Agentforce Agent** for that Agent Id on the Setup page. |
+| An action fails with an access error | The user the agent runs as needs **AgentLedger User**, or **AgentLedger Agent** for a service agent. |
+| Some steps are missing | The instructions were not pasted or were edited: copy them again. |
 
 ## Modes
 
@@ -82,12 +119,19 @@ hash, policy reference and policy hash.
 
 **Agent Run Entry** (`Agent_Audit_Record__c`), one per step: type, summary,
 reasoning, input and output, target record and object, field changes (before
-and after), capture method (Recorded Action, Agent Script, Change Detector,
+and after; fields an update set as a knock-on effect, such as an Opportunity's
+Probability following its Stage, are marked automatic), capture method (Recorded Action, Agent Script, Change Detector,
 Reported by Agent), exact timestamp, turn, agent version, instructions hash,
 policy reference and hash, entry hash and previous hash.
 
 **Agent Instructions Snapshot** (`Agent_Instructions_Snapshot__c`): the exact
 instructions an agent ran with, once per distinct version, found by its hash.
+For an agent built in the new Agentforce Builder, Salesforce keeps the
+subagents' reasoning instructions in the agent's script, which Apex cannot read.
+Its snapshot holds the agent-level instructions and subagent descriptions, and
+says so in its `coverage` field; the agent version recorded on the run (for
+example `Opportunity_Qualification_Agent v2 (Active)`) identifies the locked
+version whose full instructions can be read in Builder.
 
 **AgentLedger Setting** (`AgentLedger_Setting__mdt`): the `Org_Default` record
 and one record per agent. Custom metadata, so settings deploy between orgs.
