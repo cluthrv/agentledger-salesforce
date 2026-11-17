@@ -258,7 +258,7 @@ that the Python verifier rejected action types outside its enum ("Query",
 
 `hardening/` installs the package in a clean org and exercises it as an admin,
 a viewer and an agent user (87 checks, passing on every version from 0.1.0-4
-to 0.1.0-9; the first run upgraded from 0.1.0-3). Findings:
+to 0.1.0-10; the first run upgraded from 0.1.0-3). Findings:
 
 - **An upgrade reset the org's settings.** The package shipped the
   `Org_Default` custom metadata record, and installing a new version
@@ -339,6 +339,35 @@ Not changed: standalone Merkle proofs are verified against the root carried in
 the proof; nothing in the package uses proofs yet, and a verifier must supply
 the trusted root itself when they are exposed.
 
+### 6.8 Salesforce Code Analyzer (v5, November 2026)
+
+Run on `force-app` with PMD, the copy-paste detector, ESLint, RetireJS, Regex
+and Salesforce Graph Engine (the Flow engine needs Python and was not run; the
+package has no Flows).
+
+- **Fixed:** the older `RecordAuditTrailController` (no longer used by a
+  component, but callable by AgentLedger Users) returned the reasoning of
+  steps on other records; it now applies the same per-record check as the
+  record page. Three unused values in the Copy instructions handler.
+- **No findings** for SOQL injection, XSS, open redirects, sharing
+  declarations, or vulnerable JavaScript libraries.
+- **CRUD/FLS (PMD ApexCRUDViolation, Graph Engine ApexFlsViolation and
+  DatabaseOperationsMustUseWithSharing):** all on AgentLedger's own objects or
+  Setup objects (agent definitions, UserRecordAccess). This is by design: runs
+  are private and written only by AgentLedger code, so reads run without
+  sharing after an explicit access check (`AgentLedgerAccess`), and protected
+  run fields are written in system mode. Business records are read and written
+  in USER_MODE.
+- **Graph Engine on the Agent Activity page:** flagged a system-mode query in a
+  `with sharing` class. System mode keeps the class's sharing; a test running
+  as a Standard User with AgentLedger User confirms another user's runs are
+  not listed.
+- **Not real issues:** "hard-coded credentials" and "sensitive data" on hash
+  constants and hash fields (fingerprints, not secrets) and on the anchor Named
+  Credential *name* field; "global variables" on LWC class fields (PMD's older
+  JavaScript parser); empty catch blocks that are intentional and commented;
+  style rules (key order, ternaries, magic numbers).
+
 ## 7. Anchoring
 
 | Provider | How | Notes |
@@ -411,7 +440,7 @@ will offer to pause and resume auto-close around upgrades.
   listing later.
 - Action registrations: inside the package (Spike S2 confirmed unlocked
   packages can carry `GenAiFunction`), built in an Agentforce-shaped build org.
-  Beta versions are built with code coverage (latest 0.1.0-9); promoting a
+  Beta versions are built with code coverage (latest 0.1.0-10); promoting a
   released version, which production orgs need, is the next packaging step.
   Installing from source with `scripts/deploy.mjs` remains for development.
 - First open of the AgentLedger app shows the setup checklist.

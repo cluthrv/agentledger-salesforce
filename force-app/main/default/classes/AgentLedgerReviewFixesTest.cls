@@ -59,6 +59,10 @@ private class AgentLedgerReviewFixesTest {
         System.assert(!shown.contains(String.valueOf(b.Id)) && !shown.contains(String.valueOf(b.Id).left(15)), shown);
         System.assert(!shown.contains('Priority'), shown);
 
+        List<RecordAuditTrailController.SessionSummary> legacy = RecordAuditTrailController.getSessionsForRecord(a.Id);
+        System.assertEquals(AgentLedgerTimelineController.RESTRICTED_SUMMARY, legacy[0].records[1].reasoning,
+            'the older controller holds back the same step');
+
         AgentAuditRecorder.sealSession(runId);
         AgentLedgerEvidence.ExportedRun exported = AgentLedgerEvidence.build(runId);
         System.assertEquals(1, exported.hiddenEntries);
@@ -85,6 +89,33 @@ private class AgentLedgerReviewFixesTest {
         System.assertEquals(1, r.recordsChecked);
         System.assert(r.missing.isEmpty(), 'nothing from the restricted record');
         System.assert(r.summary.contains('not checked because you do not have access'), r.summary);
+    }
+
+    // ── Agent Activity page: other users' runs ──
+
+    @isTest
+    static void theActivityPageShowsAUserOnlyRunsSharedWithThem() {
+        settings(null);
+        Case c = new Case(Subject = 'Activity', Status = 'New', Origin = 'Web');
+        insert c;
+        updateRecord(c.Id, '{"Status": "Escalated"}', null);
+        System.assertEquals(1, AgentLedgerActivityController.getRuns(null, null, null, null).size(), 'the admin sees it');
+
+        User me = [SELECT LocaleSidKey, LanguageLocaleKey, EmailEncodingKey, TimeZoneSidKey FROM User WHERE Id = :UserInfo.getUserId()];
+        User other = new User(
+            ProfileId = [SELECT Id FROM Profile WHERE Name = 'Standard User' LIMIT 1].Id,
+            Username = 'agentledger.activity.' + Crypto.getRandomInteger() + DateTime.now().getTime() + '@example.com',
+            Email = 'agentledger.activity@example.com', LastName = 'Activity', Alias = 'alact',
+            TimeZoneSidKey = me.TimeZoneSidKey, LocaleSidKey = me.LocaleSidKey,
+            LanguageLocaleKey = me.LanguageLocaleKey, EmailEncodingKey = me.EmailEncodingKey);
+        insert other;
+        insert new PermissionSetAssignment(AssigneeId = other.Id,
+            PermissionSetId = [SELECT Id FROM PermissionSet WHERE Name = 'AgentLedger_User' LIMIT 1].Id);
+
+        System.runAs(other) {
+            System.assertEquals(0, AgentLedgerActivityController.getRuns(null, null, null, null).size(),
+                'runs are private: another user\'s run is not listed');
+        }
     }
 
     // ── "Never store" values ──

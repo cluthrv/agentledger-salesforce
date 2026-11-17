@@ -59,13 +59,25 @@ public without sharing class RecordAuditTrailController {
         }
         for (Agent_Audit_Record__c rec : [
             SELECT Id, Name, Audit_Session__c, Sequence_Number__c, Action_Timestamp__c,
-                   Agent_Id__c, Action_Type__c, Reasoning__c, Record_Hash__c, Previous_Hash__c
+                   Agent_Id__c, Action_Type__c, Reasoning__c, Record_Hash__c, Previous_Hash__c, Target_Record_Id__c
             FROM Agent_Audit_Record__c
             WHERE Audit_Session__c IN :entriesBySession.keySet()
             ORDER BY Audit_Session__c, Sequence_Number__c ASC
         ]) {
             entriesBySession.get(rec.Audit_Session__c).add(rec);
         }
+
+        // A run can touch several records: the reasoning of a step on a record
+        // the user cannot read is not returned.
+        Set<String> otherRecords = new Set<String>();
+        for (List<Agent_Audit_Record__c> recs : entriesBySession.values()) {
+            for (Agent_Audit_Record__c rec : recs) {
+                if (String.isNotBlank(rec.Target_Record_Id__c) && !idForms.contains(rec.Target_Record_Id__c)) {
+                    otherRecords.add(rec.Target_Record_Id__c);
+                }
+            }
+        }
+        Set<String> readable = AgentLedgerAccess.readableRecords(otherRecords);
 
         for (Agent_Audit_Session__c session : sessions) {
             SessionSummary summary = new SessionSummary();
@@ -92,7 +104,9 @@ public without sharing class RecordAuditTrailController {
                 info.recordId = rec.Id;
                 info.sequenceNumber = Integer.valueOf(rec.Sequence_Number__c);
                 info.actionType = rec.Action_Type__c;
-                info.reasoning = rec.Reasoning__c;
+                Boolean restricted = String.isNotBlank(rec.Target_Record_Id__c)
+                    && !idForms.contains(rec.Target_Record_Id__c) && !readable.contains(rec.Target_Record_Id__c);
+                info.reasoning = restricted ? AgentLedgerTimelineController.RESTRICTED_SUMMARY : rec.Reasoning__c;
                 info.recordHash = rec.Record_Hash__c;
                 info.previousHash = rec.Previous_Hash__c;
                 info.timestamp = rec.Action_Timestamp__c;

@@ -165,23 +165,18 @@ export default class AgentLedgerSetup extends LightningElement {
 
     async handleCopyInstructions() {
         const text = this.agentInstructionText;
-        try {
-            await navigator.clipboard.writeText(text);
+        const copiedByApi = navigator.clipboard
+            ? await navigator.clipboard.writeText(text).then(() => true, () => false)
+            : false;
+        if (copiedByApi) {
             this.toast('Instructions copied', 'Paste them as a new instruction in the subagent of this agent.', 'success');
             return;
-        } catch (e) {
-            // Clipboard API not available here: copy from the selected text instead.
         }
+        // Clipboard API not available here: copy from the selected text instead.
         const box = this.template.querySelector('textarea.instructions');
         box.focus();
         box.select();
-        let copied = false;
-        try {
-            // eslint-disable-next-line @lwc/lwc/no-document-query
-            copied = document.execCommand('copy');
-        } catch (e) {
-            copied = false;
-        }
+        const copied = typeof document.execCommand === 'function' && document.execCommand('copy');
         if (copied) {
             this.toast('Instructions copied', 'Paste them as a new instruction in the subagent of this agent.', 'success');
         } else {
