@@ -49,98 +49,6 @@ public inherited sharing class MerkleTreeService {
     }
 
     /**
-     * Generate a Merkle proof for a specific record.
-     * The proof contains sibling hashes needed to recompute
-     * the root from the target leaf.
-     *
-     * @param hashes All Action Record hashes in the session
-     * @param recordIndex Index of the record to prove
-     * @return MerkleProof object, or null if index is out of bounds
-     */
-    public static MerkleProof generateProof(List<String> hashes, Integer recordIndex) {
-        if (hashes == null || hashes.isEmpty() ||
-            recordIndex < 0 || recordIndex >= hashes.size()) {
-            return null;
-        }
-
-        String root = computeMerkleRoot(hashes);
-        if (root == null) {
-            return null;
-        }
-
-        // Build leaf hashes
-        List<String> leafHashes = new List<String>();
-        for (String h : hashes) {
-            leafHashes.add(HashChainService.sha256(h));
-        }
-
-        List<ProofSibling> siblings = new List<ProofSibling>();
-        List<String> currentLevel = new List<String>(leafHashes);
-        Integer targetIndex = recordIndex;
-
-        while (currentLevel.size() > 1) {
-            List<String> nextLevel = new List<String>();
-
-            for (Integer i = 0; i < currentLevel.size(); i += 2) {
-                String left = currentLevel[i];
-                String right = (i + 1 < currentLevel.size())
-                    ? currentLevel[i + 1]
-                    : currentLevel[i];
-
-                // If target is in this pair, collect sibling
-                if (i == targetIndex || i + 1 == targetIndex) {
-                    ProofSibling sibling = new ProofSibling();
-                    if (Math.mod(targetIndex, 2) == 0) {
-                        sibling.hash = right;
-                        sibling.position = 'right';
-                    } else {
-                        sibling.hash = left;
-                        sibling.position = 'left';
-                    }
-                    siblings.add(sibling);
-                }
-
-                nextLevel.add(HashChainService.combineHashes(left, right));
-            }
-
-            currentLevel = nextLevel;
-            targetIndex = targetIndex / 2;
-        }
-
-        MerkleProof proof = new MerkleProof();
-        proof.recordIndex = recordIndex;
-        proof.recordHash = hashes[recordIndex];
-        proof.siblings = siblings;
-        proof.root = root;
-
-        return proof;
-    }
-
-    /**
-     * Verify a Merkle proof against a claimed root hash.
-     *
-     * @param proof The MerkleProof to verify
-     * @return true if the proof is valid
-     */
-    public static Boolean verifyProof(MerkleProof proof) {
-        if (proof == null || proof.siblings == null) {
-            return false;
-        }
-
-        String currentHash = HashChainService.sha256(proof.recordHash);
-
-        for (ProofSibling sibling : proof.siblings) {
-            if (sibling.position == 'right') {
-                currentHash = HashChainService.combineHashes(currentHash, sibling.hash);
-            } else {
-                currentHash = HashChainService.combineHashes(sibling.hash, currentHash);
-            }
-        }
-
-        return currentHash == proof.root;
-    }
-
-    /**
      * Seal a session by computing the Merkle root from its records.
      * Updates the session record with the root hash and sealed status.
      *
@@ -240,57 +148,6 @@ public inherited sharing class MerkleTreeService {
         return level[0];
     }
 
-    /**
-     * A v2 proof for one record. A level where the record's node is carried up
-     * adds no sibling.
-     */
-    public static MerkleProof generateProofV2(List<String> hashes, Integer recordIndex) {
-        if (hashes == null || hashes.isEmpty() || recordIndex == null ||
-            recordIndex < 0 || recordIndex >= hashes.size()) {
-            return null;
-        }
-        List<String> level = new List<String>();
-        for (String h : hashes) {
-            level.add(merkleLeafV2(h));
-        }
-        List<ProofSibling> siblings = new List<ProofSibling>();
-        Integer index = recordIndex;
-        while (level.size() > 1) {
-            Integer pair = Math.mod(index, 2) == 0 ? index + 1 : index - 1;
-            if (pair < level.size()) {
-                ProofSibling sibling = new ProofSibling();
-                sibling.hash = level[pair];
-                sibling.position = Math.mod(index, 2) == 0 ? 'right' : 'left';
-                siblings.add(sibling);
-            }
-            level = nextLevelV2(level);
-            index = index / 2;
-        }
-        MerkleProof proof = new MerkleProof();
-        proof.recordIndex = recordIndex;
-        proof.recordHash = hashes[recordIndex];
-        proof.siblings = siblings;
-        proof.root = level[0];
-        return proof;
-    }
-
-    public static Boolean verifyProofV2(MerkleProof proof) {
-        if (proof == null || proof.siblings == null || proof.recordHash == null) {
-            return false;
-        }
-        try {
-            String current = merkleLeafV2(proof.recordHash);
-            for (ProofSibling sibling : proof.siblings) {
-                current = sibling.position == 'right'
-                    ? merkleNodeV2(current, sibling.hash)
-                    : merkleNodeV2(sibling.hash, current);
-            }
-            return current == proof.root;
-        } catch (AgentLedgerException e) {
-            return false;
-        }
-    }
-
     private static List<String> nextLevelV2(List<String> level) {
         List<String> next = new List<String>();
         for (Integer i = 0; i < level.size(); i += 2) {
@@ -308,24 +165,6 @@ public inherited sharing class MerkleTreeService {
             throw new AgentLedgerException('Not a SHA-256 hex hash: ' + h);
         }
         return h;
-    }
-
-    /**
-     * Represents a Merkle proof for a single record.
-     */
-    public class MerkleProof {
-        @AuraEnabled public Integer recordIndex;
-        @AuraEnabled public String recordHash;
-        @AuraEnabled public List<ProofSibling> siblings;
-        @AuraEnabled public String root;
-    }
-
-    /**
-     * A sibling hash in a Merkle proof path.
-     */
-    public class ProofSibling {
-        @AuraEnabled public String hash;
-        @AuraEnabled public String position; // 'left' or 'right'
     }
 
     public class AgentLedgerException extends Exception {}

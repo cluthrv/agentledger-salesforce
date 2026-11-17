@@ -322,53 +322,6 @@ public with sharing class AgentAuditRecorder {
     }
 
     /**
-     * Get all records for a session, ordered by sequence.
-     * Exposed to LWC via AuraEnabled.
-     */
-    @AuraEnabled(cacheable=true)
-    public static List<Agent_Audit_Record__c> getSessionRecords(Id sessionId) {
-        return queryEntries(sessionId);
-    }
-
-    /**
-     * Get session details. Exposed to LWC.
-     */
-    @AuraEnabled(cacheable=true)
-    public static Agent_Audit_Session__c getSession(Id sessionId) {
-        return [
-            SELECT Id, Name, Session_Id__c, Agent_Id__c, Merkle_Root__c,
-                   Status__c, Record_Count__c, Initiator__c, Platform__c,
-                   Start_Time__c, End_Time__c, Hash_Version__c,
-                   Integrity__c, Last_Verified_At__c, Mode__c, Started_By__c, Related_Object__c
-            FROM Agent_Audit_Session__c
-            WHERE Id = :sessionId
-            LIMIT 1
-        ];
-    }
-
-    /**
-     * Generate a Merkle proof for one record of a run, with the run's hash version.
-     */
-    @AuraEnabled
-    public static MerkleTreeService.MerkleProof generateProof(Id sessionId, Integer recordIndex) {
-        Agent_Audit_Session__c session = [
-            SELECT Hash_Version__c FROM Agent_Audit_Session__c WHERE Id = :sessionId LIMIT 1
-        ];
-        List<String> hashes = new List<String>();
-        for (Agent_Audit_Record__c rec : [
-            SELECT Record_Hash__c
-            FROM Agent_Audit_Record__c
-            WHERE Audit_Session__c = :sessionId
-            ORDER BY Sequence_Number__c ASC
-        ]) {
-            hashes.add(rec.Record_Hash__c);
-        }
-        return HashChainService.versionOf(session.Hash_Version__c) == HashChainService.HASH_V2
-            ? MerkleTreeService.generateProofV2(hashes, recordIndex)
-            : MerkleTreeService.generateProof(hashes, recordIndex);
-    }
-
-    /**
      * An 18-character Id for any 15- or 18-character Id; blank stays null.
      * Throws on a value that is not a Salesforce Id.
      */
@@ -381,21 +334,6 @@ public with sharing class AgentAuditRecorder {
         } catch (StringException e) {
             throw new MerkleTreeService.AgentLedgerException('Not a valid Salesforce record Id: ' + value);
         }
-    }
-
-    private static List<Agent_Audit_Record__c> queryEntries(Id sessionId) {
-        return [
-            SELECT Id, Name, Audit_Session__c, Sequence_Number__c, Entry_Id__c,
-                   Action_Timestamp__c, Timestamp_Text__c, Agent_Id__c, Action_Type__c,
-                   Input_Context__c, Output_Result__c, Reasoning__c, Summary__c,
-                   Target_Record_Id__c, Target_Object__c, Field_Changes__c,
-                   Capture_Method__c, Turn_Number__c, Agent_Version__c, Instructions_Hash__c,
-                   Policy_Reference__c, Policy_Hash__c,
-                   Record_Hash__c, Previous_Hash__c, CreatedBy.TimeZoneSidKey
-            FROM Agent_Audit_Record__c
-            WHERE Audit_Session__c = :sessionId
-            ORDER BY Sequence_Number__c ASC
-        ];
     }
 
     /** A run that can no longer take entries: Closed, Incomplete, or a closed status from earlier versions. */

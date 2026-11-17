@@ -77,56 +77,6 @@ private class AgentLedgerTest {
         System.assertNotEquals(root1, root2, 'Different order should produce different roots');
     }
 
-    @isTest
-    static void testMerkleProofGeneration() {
-        List<String> hashes = new List<String>{'rec-0', 'rec-1', 'rec-2', 'rec-3'};
-
-        for (Integer i = 0; i < hashes.size(); i++) {
-            MerkleTreeService.MerkleProof proof = MerkleTreeService.generateProof(hashes, i);
-            System.assertNotEquals(null, proof, 'Proof should not be null for valid index');
-            System.assertEquals(i, proof.recordIndex, 'Record index should match');
-            System.assertEquals(hashes[i], proof.recordHash, 'Record hash should match');
-            System.assert(!proof.siblings.isEmpty(), 'Proof should have siblings');
-        }
-    }
-
-    @isTest
-    static void testMerkleProofOutOfBounds() {
-        List<String> hashes = new List<String>{'a', 'b', 'c'};
-        System.assertEquals(null, MerkleTreeService.generateProof(hashes, -1));
-        System.assertEquals(null, MerkleTreeService.generateProof(hashes, 3));
-        System.assertEquals(null, MerkleTreeService.generateProof(hashes, 100));
-    }
-
-    @isTest
-    static void testMerkleProofVerification() {
-        List<String> hashes = new List<String>{'alpha', 'beta', 'gamma', 'delta'};
-
-        for (Integer i = 0; i < hashes.size(); i++) {
-            MerkleTreeService.MerkleProof proof = MerkleTreeService.generateProof(hashes, i);
-            System.assert(MerkleTreeService.verifyProof(proof),
-                'Valid proof should verify for index ' + i);
-        }
-    }
-
-    @isTest
-    static void testMerkleProofRejectsTamperedHash() {
-        List<String> hashes = new List<String>{'a', 'b', 'c', 'd'};
-        MerkleTreeService.MerkleProof proof = MerkleTreeService.generateProof(hashes, 1);
-        proof.recordHash = 'tampered-hash';
-        System.assert(!MerkleTreeService.verifyProof(proof),
-            'Tampered proof should fail verification');
-    }
-
-    @isTest
-    static void testMerkleProofRejectsTamperedRoot() {
-        List<String> hashes = new List<String>{'a', 'b', 'c', 'd'};
-        MerkleTreeService.MerkleProof proof = MerkleTreeService.generateProof(hashes, 2);
-        proof.root = 'fake-root';
-        System.assert(!MerkleTreeService.verifyProof(proof),
-            'Proof with tampered root should fail');
-    }
-
     // ── AgentAuditRecorder Integration Tests ──
 
    @isTest
@@ -264,23 +214,6 @@ private class AgentLedgerTest {
         }
     }
 
-    @isTest
-    static void testGetSessionRecords() {
-        Id sessionId = AgentAuditRecorder.startSession('test-agent', RELATED_ID, 'salesforce');
-
-        AgentAuditRecorder.recordAction(sessionId, 'test-agent', 'Query',
-            '{}', '{}', 'R1');
-        AgentAuditRecorder.recordAction(sessionId, 'test-agent', 'Update',
-            '{}', '{}', 'R2');
-
-        List<Agent_Audit_Record__c> records =
-            AgentAuditRecorder.getSessionRecords(sessionId);
-
-        System.assertEquals(2, records.size());
-        System.assertEquals(0, records[0].Sequence_Number__c);
-        System.assertEquals(1, records[1].Sequence_Number__c);
-    }
-
     /** A sealed run with seven entries, the shape the old runDemo produced. */
     private static Id sealedSevenEntryRun() {
         Id sessionId = AgentAuditRecorder.startSession('cpq-pricing-agent', RELATED_ID, 'salesforce');
@@ -304,20 +237,5 @@ private class AgentLedgerTest {
         System.assertEquals('Closed', session.Status__c);
         System.assertEquals(7, session.Record_Count__c);
         System.assertNotEquals(null, session.Merkle_Root__c);
-    }
-
-    @isTest
-    static void testGenerateProofFromSession() {
-        Id sessionId = sealedSevenEntryRun();
-
-        MerkleTreeService.MerkleProof proof =
-            AgentAuditRecorder.generateProof(sessionId, 3);
-
-        System.assertNotEquals(null, proof);
-        System.assertEquals(3, proof.recordIndex);
-        System.assert(MerkleTreeService.verifyProofV2(proof),
-            'Proof should verify against session root');
-        System.assertEquals([SELECT Merkle_Root__c FROM Agent_Audit_Session__c WHERE Id = :sessionId].Merkle_Root__c,
-            proof.root, 'Proof root is the sealed root');
     }
 }

@@ -160,26 +160,8 @@ private class AgentLedgerV2Test {
     static void theRecordPageFindsRunsByEitherIdForm() {
         sealedRun();
         AgentLedgerAccess.readAccessForTest = new Map<Id, Boolean>{ Id.valueOf(RELATED_ID) => true }; // the viewer can read the record
-        System.assertEquals(1, RecordAuditTrailController.getSessionsForRecord(RELATED_ID).size(), '15-character form');
-        System.assertEquals(1, RecordAuditTrailController.getSessionsForRecord(String.valueOf(Id.valueOf(RELATED_ID))).size(), '18-character form');
-    }
-
-    @isTest
-    static void v2ProofsVerifyForEverySize() {
-        List<String> hashes = new List<String>();
-        for (Integer n = 1; n <= 7; n++) {
-            hashes.add(HashChainService.sha256('record-' + n));
-            String root = MerkleTreeService.computeMerkleRootV2(hashes);
-            for (Integer i = 0; i < n; i++) {
-                MerkleTreeService.MerkleProof proof = MerkleTreeService.generateProofV2(hashes, i);
-                System.assertEquals(root, proof.root);
-                System.assert(MerkleTreeService.verifyProofV2(proof), 'size ' + n + ' index ' + i);
-            }
-        }
-        MerkleTreeService.MerkleProof proof = MerkleTreeService.generateProofV2(hashes, 3);
-        proof.recordHash = hashes[4];
-        System.assert(!MerkleTreeService.verifyProofV2(proof), 'a proof for another record fails');
-        System.assertEquals(null, MerkleTreeService.generateProofV2(hashes, 7));
+        System.assertEquals(1, AgentLedgerTimelineController.getTimeline(RELATED_ID, 10, null).runs.size(), '15-character form');
+        System.assertEquals(1, AgentLedgerTimelineController.getTimeline(String.valueOf(Id.valueOf(RELATED_ID)), 10, null).runs.size(), '18-character form');
     }
 
     @isTest

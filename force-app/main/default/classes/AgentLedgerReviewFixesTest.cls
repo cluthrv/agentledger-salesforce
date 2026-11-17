@@ -59,10 +59,6 @@ private class AgentLedgerReviewFixesTest {
         System.assert(!shown.contains(String.valueOf(b.Id)) && !shown.contains(String.valueOf(b.Id).left(15)), shown);
         System.assert(!shown.contains('Priority'), shown);
 
-        List<RecordAuditTrailController.SessionSummary> legacy = RecordAuditTrailController.getSessionsForRecord(a.Id);
-        System.assertEquals(AgentLedgerTimelineController.RESTRICTED_SUMMARY, legacy[0].records[1].reasoning,
-            'the older controller holds back the same step');
-
         AgentAuditRecorder.sealSession(runId);
         AgentLedgerEvidence.ExportedRun exported = AgentLedgerEvidence.build(runId);
         System.assertEquals(1, exported.hiddenEntries);

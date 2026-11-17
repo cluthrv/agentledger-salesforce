@@ -14,8 +14,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'force-app', 'main', 'default');
 const OBJECTS = ['Agent_Audit_Session__c', 'Agent_Audit_Record__c', 'Agent_Instructions_Snapshot__c'];
-const ACTIONS = ['StartAgentLedgerSessionAction', 'RecordAgentActionAction', 'SealAgentLedgerSessionAction',
-  'VerifyAgentLedgerSessionAction', 'GetRecordAgentLedgerAction', 'UpdateRecordAgentLedgerAction',
+const ACTIONS = ['RecordAgentActionAction', 'SealAgentLedgerSessionAction',
+  'GetRecordAgentLedgerAction', 'UpdateRecordAgentLedgerAction',
   'CreateRecordAgentLedgerAction'];
 const TAMPER_FIELDS = ['Agent_Audit_Record__c.Reasoning__c', 'Agent_Audit_Record__c.Input_Context__c',
   'Agent_Audit_Record__c.Output_Result__c', 'Agent_Audit_Record__c.Summary__c', 'Agent_Audit_Record__c.Field_Changes__c',
@@ -63,7 +63,7 @@ permissionSet('AgentLedger_Admin', 'AgentLedger Admin',
 permissionSet('AgentLedger_User', 'AgentLedger User',
   'For people who work on records and use employee agents: read the activity log of records they can see, verify runs, and run the AgentLedger agent actions.',
   x.app('AgentLedger') +
-  ['RecordAuditTrailController', 'AgentLedgerTimelineController', 'AgentLedgerActivityController', 'AgentLedgerEvidence', 'AgentLedgerReconciliation', ...ACTIONS].sort().map(x.cls).join('') +
+  ['AgentLedgerTimelineController', 'AgentLedgerActivityController', 'AgentLedgerEvidence', 'AgentLedgerReconciliation', ...ACTIONS].sort().map(x.cls).join('') +
   allFields.map((f) => x.fld(f, false)).join('') + OBJECTS.map((o) => x.obj(o)).join('') + x.tab('AgentLedger_Activity'));
 
 permissionSet('AgentLedger_Agent', 'AgentLedger Agent',

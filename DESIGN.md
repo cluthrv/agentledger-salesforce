@@ -228,7 +228,8 @@ control. That is what export and anchoring address, and the docs say so.
 
 ### 6.4 Selective disclosure (added after the CACM review)
 
-- **One entry with its proof:** export a single entry, its Merkle proof and the
+- **One entry with its proof:** export a single entry, its Merkle proof (to be
+  rebuilt, verified against a root the auditor supplies) and the
   run's anchor token, so an auditor can verify that one decision without seeing
   the rest of the run.
 - **Salted commitments:** for fields whose values must not be stored, store a
@@ -258,7 +259,7 @@ that the Python verifier rejected action types outside its enum ("Query",
 
 `hardening/` installs the package in a clean org and exercises it as an admin,
 a viewer and an agent user (87 checks, passing on every version from 0.1.0-4
-to 0.1.0-10; the first run upgraded from 0.1.0-3). Findings:
+to 0.1.0-11; the first run upgraded from 0.1.0-3). Findings:
 
 - **An upgrade reset the org's settings.** The package shipped the
   `Org_Default` custom metadata record, and installing a new version
@@ -335,9 +336,9 @@ An external review of the public repository found, and the code confirmed:
 - **Check history** counted a field as covered if the log had it once. Each
   Field History row now needs a logged change of its own, matched oldest first.
 
-Not changed: standalone Merkle proofs are verified against the root carried in
-the proof; nothing in the package uses proofs yet, and a verifier must supply
-the trusted root itself when they are exposed.
+Standalone Merkle proofs were verified against the root carried in the proof.
+Nothing in the package used them, so they were removed (6.9); selective
+disclosure (6.4) will bring them back with a caller-supplied trusted root.
 
 ### 6.8 Salesforce Code Analyzer (v5, November 2026)
 
@@ -367,6 +368,28 @@ package has no Flows).
   Credential *name* field; "global variables" on LWC class fields (PMD's older
   JavaScript parser); empty catch blocks that are intentional and commented;
   style rules (key order, ternaries, magic numbers).
+
+### 6.9 Removed (0.1.0-11)
+
+Code nothing used, removed to shrink what can go wrong:
+
+- **Start AgentLedger Session** and **Verify AgentLedger Session** actions:
+  runs start automatically on the first AgentLedger action, and people verify
+  on the record page. Neither was linked to any agent in the test orgs.
+- **RecordAuditTrailController**: the record page uses
+  AgentLedgerTimelineController.
+- **AgentAuditRecorder.getSession, getSessionRecords and generateProof**:
+  AuraEnabled methods no component called, which returned a run or its
+  entries by Id without an access check.
+- **Merkle proof generation and verification** in MerkleTreeService (see 6.7).
+- **package.json and jest.config.js** from the project template: there are no
+  LWC Jest tests and no lint hooks set up.
+
+New installs do not get the removed components. On an upgrade, Salesforce
+deletes what it safely can and leaves the rest deprecated: in the hardening
+org, RecordAuditTrailController was deleted, while the Start and Verify
+actions and their classes (which reference each other) stayed. An admin can
+delete them after removing them from any agent.
 
 ## 7. Anchoring
 
@@ -440,7 +463,7 @@ will offer to pause and resume auto-close around upgrades.
   listing later.
 - Action registrations: inside the package (Spike S2 confirmed unlocked
   packages can carry `GenAiFunction`), built in an Agentforce-shaped build org.
-  Beta versions are built with code coverage (latest 0.1.0-10); promoting a
+  Beta versions are built with code coverage (latest 0.1.0-11); promoting a
   released version, which production orgs need, is the next packaging step.
   Installing from source with `scripts/deploy.mjs` remains for development.
 - First open of the AgentLedger app shows the setup checklist.
@@ -475,7 +498,7 @@ recorded actions fix.
 | **3** | Hash v2, Export Evidence, verification log, RFC 3161 and custom anchoring, Setup page (Privacy, Anchoring, Health) |
 | Later | Human override module, reconciliation with Agentforce session tracing, multi-agent run linking |
 
-Every phase: Apex tests, LWC Jest tests, cross-language hash vectors (from
+Every phase: Apex tests, cross-language hash vectors (from
 Phase 3), and an end-to-end pass with the Opportunity and Case agents in the Dev
 Hub org.
 

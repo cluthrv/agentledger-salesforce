@@ -71,12 +71,12 @@ job.
 
 Requires Agentforce in the org.
 
-**Package.** Install the latest version, 0.1.0-10, from this link (for a
+**Package.** Install the latest version, 0.1.0-11, from this link (for a
 sandbox, use `test.salesforce.com` instead of `login.salesforce.com`), and choose
 **Install for Admins Only**:
 
 ```text
-https://login.salesforce.com/packaging/installPackage.apexp?p0=04tgK000000aoMTQAY
+https://login.salesforce.com/packaging/installPackage.apexp?p0=04tgK000000aoPhQAI
 ```
 
 This is a beta version: Salesforce installs it in sandboxes, scratch orgs and

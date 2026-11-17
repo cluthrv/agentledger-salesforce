@@ -73,23 +73,17 @@ private class AgentLedgerSettingsTest {
         useRecords('[{"DeveloperName":"Org_Default","Enabled__c":true},' +
                    '{"DeveloperName":"Off","Agent_Api_Name__c":"off-agent","Enabled__c":false}]');
 
-        StartAgentLedgerSessionAction.Request start = new StartAgentLedgerSessionAction.Request();
-        start.agentId = 'off-agent';
-        start.relatedRecordId = CASE_ID;
-        StartAgentLedgerSessionAction.Result started =
-            StartAgentLedgerSessionAction.execute(new List<StartAgentLedgerSessionAction.Request>{ start })[0];
-        System.assert(started.success);
-        System.assertEquals(null, started.sessionId);
+        System.assertEquals(null, AgentLedgerRuns.findOrStart('off-agent', CASE_ID), 'no run for a turned-off agent');
 
         RecordAgentActionAction.Request rec = new RecordAgentActionAction.Request();
-        rec.sessionId = started.sessionId;
+        rec.sessionId = null;
         rec.agentId = 'off-agent';
         rec.actionType = 'Decision';
         rec.reasoning = 'Would have been recorded';
         System.assert(RecordAgentActionAction.execute(new List<RecordAgentActionAction.Request>{ rec })[0].success);
 
         SealAgentLedgerSessionAction.Request seal = new SealAgentLedgerSessionAction.Request();
-        seal.sessionId = started.sessionId;
+        seal.sessionId = null;
         System.assert(SealAgentLedgerSessionAction.execute(new List<SealAgentLedgerSessionAction.Request>{ seal })[0].success);
 
         System.assertEquals(0, [SELECT COUNT() FROM Agent_Audit_Session__c]);

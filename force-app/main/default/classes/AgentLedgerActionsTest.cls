@@ -1,147 +1,19 @@
 /**
  * AgentLedgerActionsTest
  *
- * Test coverage for the four AgentLedger Invocable Actions used by
- * Agentforce and Flow:
- *   - StartAgentLedgerSessionAction
- *   - RecordAgentActionAction
- *   - SealAgentLedgerSessionAction
- *   - VerifyAgentLedgerSessionAction
- *
- * Also covers HashChainService (hashActionRecord, verifyChain broken-chain
- * detection) and MerkleTreeService (computeMerkleRoot edge cases).
- *
- * Covers success paths, validation/error paths, the exception path, and
- * the full start -> record -> seal -> verify lifecycle.
+ * The Record Agent Action and Seal AgentLedger Session actions, the full
+ * record -> seal -> verify lifecycle, HashChainService (broken-chain
+ * detection) and MerkleTreeService (root edge cases). Runs start
+ * automatically; here they are started through AgentAuditRecorder.
  */
 @isTest
 private class AgentLedgerActionsTest {
 
-    // ── Helper: start a session through the action and return its Id ──
+    // ── Helper: start a run and return its Id ──
     private static Id startViaAction(String agentId, String relatedRecordId) {
-        StartAgentLedgerSessionAction.Request req =
-            new StartAgentLedgerSessionAction.Request();
-        req.agentId = agentId;
-        req.relatedRecordId = relatedRecordId;
-        req.platform = 'salesforce';
-
-        List<StartAgentLedgerSessionAction.Result> results =
-            StartAgentLedgerSessionAction.execute(
-                new List<StartAgentLedgerSessionAction.Request>{ req });
-
-        System.assertEquals(1, results.size());
-        System.assert(results[0].success, 'Start failed: ' + results[0].errorMessage);
-        System.assertNotEquals(null, results[0].sessionId);
-        return results[0].sessionId;
-    }
-
-    // ════════════════════════════════════════════════════════════
-    // StartAgentLedgerSessionAction
-    // ════════════════════════════════════════════════════════════
-
-    @isTest
-    static void testStartSuccess() {
-        Test.startTest();
-        Id sessionId = startViaAction('opportunity-qualification-agent', '006000000000001');
-        Test.stopTest();
-
-        Agent_Audit_Session__c s = [
-            SELECT Agent_Id__c, Related_Record_Id__c, Platform__c, Status__c
-            FROM Agent_Audit_Session__c WHERE Id = :sessionId
-        ];
-        System.assertEquals('opportunity-qualification-agent', s.Agent_Id__c);
-        System.assertEquals(String.valueOf(Id.valueOf('006000000000001')), s.Related_Record_Id__c,
-            'stored as 18 characters');
-        System.assertEquals('salesforce', s.Platform__c);
-        System.assertEquals('Active', s.Status__c);
-    }
-
-    @isTest
-    static void testStartMissingAgentId() {
-        StartAgentLedgerSessionAction.Request req =
-            new StartAgentLedgerSessionAction.Request();
-        req.agentId = '';
-        req.relatedRecordId = '006000000000001';
-
-        List<StartAgentLedgerSessionAction.Result> results =
-            StartAgentLedgerSessionAction.execute(
-                new List<StartAgentLedgerSessionAction.Request>{ req });
-
-        System.assertEquals(false, results[0].success);
-        System.assertNotEquals(null, results[0].errorMessage);
-    }
-
-    @isTest
-    static void testStartMissingRelatedRecordId() {
-        StartAgentLedgerSessionAction.Request req =
-            new StartAgentLedgerSessionAction.Request();
-        req.agentId = 'agent-x';
-        req.relatedRecordId = '';
-
-        List<StartAgentLedgerSessionAction.Result> results =
-            StartAgentLedgerSessionAction.execute(
-                new List<StartAgentLedgerSessionAction.Request>{ req });
-
-        System.assertEquals(false, results[0].success);
-        System.assertNotEquals(null, results[0].errorMessage);
-    }
-
-    @isTest
-    static void testStartDefaultsPlatform() {
-        StartAgentLedgerSessionAction.Request req =
-            new StartAgentLedgerSessionAction.Request();
-        req.agentId = 'agent-x';
-        req.relatedRecordId = '006000000000009';
-        req.platform = null; // should default to 'salesforce'
-
-        List<StartAgentLedgerSessionAction.Result> results =
-            StartAgentLedgerSessionAction.execute(
-                new List<StartAgentLedgerSessionAction.Request>{ req });
-
-        System.assert(results[0].success, 'Start failed: ' + results[0].errorMessage);
-        Agent_Audit_Session__c s = [
-            SELECT Platform__c FROM Agent_Audit_Session__c
-            WHERE Id = :results[0].sessionId
-        ];
-        System.assertEquals('salesforce', s.Platform__c);
-    }
-
-    @isTest
-    static void testStartExceptionPath() {
-        // Related_Record_Id__c is Text(18); a 300-char value forces a
-        // StringException on insert, exercising the catch block.
-        StartAgentLedgerSessionAction.Request req =
-            new StartAgentLedgerSessionAction.Request();
-        req.agentId = 'agent-x';
-        req.relatedRecordId = 'x'.repeat(300);
-        req.platform = 'salesforce';
-
-        List<StartAgentLedgerSessionAction.Result> results =
-            StartAgentLedgerSessionAction.execute(
-                new List<StartAgentLedgerSessionAction.Request>{ req });
-
-        System.assertEquals(false, results[0].success);
-        System.assertNotEquals(null, results[0].errorMessage);
-    }
-
-    @isTest
-    static void testStartBulk() {
-        List<StartAgentLedgerSessionAction.Request> reqs =
-            new List<StartAgentLedgerSessionAction.Request>();
-        for (Integer i = 0; i < 3; i++) {
-            StartAgentLedgerSessionAction.Request r =
-                new StartAgentLedgerSessionAction.Request();
-            r.agentId = 'bulk-agent-' + i;
-            r.relatedRecordId = '00600000000000' + i;
-            r.platform = 'salesforce';
-            reqs.add(r);
-        }
-        List<StartAgentLedgerSessionAction.Result> results =
-            StartAgentLedgerSessionAction.execute(reqs);
-        System.assertEquals(3, results.size());
-        for (StartAgentLedgerSessionAction.Result res : results) {
-            System.assert(res.success, 'Bulk start failed: ' + res.errorMessage);
-        }
+        Id sessionId = AgentAuditRecorder.startSession(agentId, relatedRecordId, 'salesforce');
+        System.assertNotEquals(null, sessionId);
+        return sessionId;
     }
 
     // ════════════════════════════════════════════════════════════
@@ -286,54 +158,6 @@ private class AgentLedgerActionsTest {
     }
 
     // ════════════════════════════════════════════════════════════
-    // VerifyAgentLedgerSessionAction
-    // ════════════════════════════════════════════════════════════
-
-    @isTest
-    static void testVerifySuccess() {
-        Id sessionId = startViaAction('agent-3', '006000000000006');
-
-        RecordAgentActionAction.Request rec = new RecordAgentActionAction.Request();
-        rec.sessionId = sessionId;
-        rec.agentId = 'agent-3';
-        rec.actionType = 'Decision';
-        rec.reasoning = 'Final decision recorded.';
-        RecordAgentActionAction.execute(
-            new List<RecordAgentActionAction.Request>{ rec });
-
-        SealAgentLedgerSessionAction.Request seal =
-            new SealAgentLedgerSessionAction.Request();
-        seal.sessionId = sessionId;
-        SealAgentLedgerSessionAction.execute(
-            new List<SealAgentLedgerSessionAction.Request>{ seal });
-
-        Test.startTest();
-        VerifyAgentLedgerSessionAction.Request ver =
-            new VerifyAgentLedgerSessionAction.Request();
-        ver.sessionId = sessionId;
-        List<VerifyAgentLedgerSessionAction.Result> results =
-            VerifyAgentLedgerSessionAction.execute(
-                new List<VerifyAgentLedgerSessionAction.Request>{ ver });
-        Test.stopTest();
-
-        System.assert(results[0].success, 'Verify failed: ' + results[0].errorMessage);
-        System.assert(results[0].valid, 'Invalid: ' + results[0].message);
-    }
-
-    @isTest
-    static void testVerifyMissingSessionId() {
-        VerifyAgentLedgerSessionAction.Request ver =
-            new VerifyAgentLedgerSessionAction.Request();
-        ver.sessionId = null;
-
-        List<VerifyAgentLedgerSessionAction.Result> results =
-            VerifyAgentLedgerSessionAction.execute(
-                new List<VerifyAgentLedgerSessionAction.Request>{ ver });
-
-        System.assertEquals(false, results[0].success);
-    }
-
-    // ════════════════════════════════════════════════════════════
     // Full lifecycle through the action layer
     // ════════════════════════════════════════════════════════════
 
@@ -364,13 +188,8 @@ private class AgentLedgerActionsTest {
                 new List<SealAgentLedgerSessionAction.Request>{ seal });
         System.assert(sealRes[0].success, 'Seal failed: ' + sealRes[0].errorMessage);
 
-        VerifyAgentLedgerSessionAction.Request ver =
-            new VerifyAgentLedgerSessionAction.Request();
-        ver.sessionId = sessionId;
-        List<VerifyAgentLedgerSessionAction.Result> verRes =
-            VerifyAgentLedgerSessionAction.execute(
-                new List<VerifyAgentLedgerSessionAction.Request>{ ver });
-        System.assert(verRes[0].valid, 'Verify failed: ' + verRes[0].message);
+        AgentAuditRecorder.VerifySessionResult verRes = AgentAuditRecorder.verifySession(sessionId);
+        System.assert(verRes.valid, 'Verify failed: ' + verRes.message);
 
         Agent_Audit_Session__c s = [
             SELECT Status__c, Record_Count__c

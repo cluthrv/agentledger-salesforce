@@ -93,23 +93,11 @@
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
-        <apexClass>RecordAuditTrailController</apexClass>
-        <enabled>true</enabled>
-    </classAccesses>
-    <classAccesses>
         <apexClass>SealAgentLedgerSessionAction</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
-        <apexClass>StartAgentLedgerSessionAction</apexClass>
-        <enabled>true</enabled>
-    </classAccesses>
-    <classAccesses>
         <apexClass>UpdateRecordAgentLedgerAction</apexClass>
-        <enabled>true</enabled>
-    </classAccesses>
-    <classAccesses>
-        <apexClass>VerifyAgentLedgerSessionAction</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <fieldPermissions>

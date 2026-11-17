@@ -293,7 +293,7 @@ runs a subset.
 
 | Test class | Covers |
 | --- | --- |
-| AgentLedgerTest, AgentLedgerActionsTest, RecordAuditTrailControllerTest | Core engine and the original actions |
+| AgentLedgerTest, AgentLedgerActionsTest | Core engine, Record Agent Action and Seal |
 | AgentLedgerV2Test, AgentLedgerHashVectorsTest | v2 hashing, time zones, cross-checks with the npm library |
 | AgentLedgerGuardTest | Append-only ledger, lifecycle and integrity |
 | AgentLedgerSettingsTest | Settings and modes |

@@ -182,18 +182,18 @@ private class AgentLedgerPolicyTest {
         Id caseId = Id.valueOf(CASE_ID);
 
         AgentLedgerAccess.readAccessForTest = new Map<Id, Boolean>{ caseId => true, runId => false };
-        System.assertEquals(1, RecordAuditTrailController.getSessionsForRecord(CASE_ID).size());
+        System.assertEquals(1, AgentLedgerTimelineController.getTimeline(CASE_ID, 10, null).runs.size());
         System.assert(AgentAuditRecorder.verifySession(runId).valid, 'reading the related record is enough to verify');
 
         AgentLedgerAccess.readAccessForTest = new Map<Id, Boolean>{ caseId => false, runId => false };
-        System.assertEquals(0, RecordAuditTrailController.getSessionsForRecord(CASE_ID).size());
+        System.assertEquals(0, AgentLedgerTimelineController.getTimeline(CASE_ID, 10, null).runs.size());
         try {
             AgentAuditRecorder.verifySession(runId);
             System.assert(false, 'no access, no verification');
         } catch (MerkleTreeService.AgentLedgerException e) {
             System.assert(e.getMessage().contains('do not have access'));
         }
-        System.assertEquals(0, RecordAuditTrailController.getSessionsForRecord('not-an-id').size());
+        System.assertEquals(0, AgentLedgerTimelineController.getTimeline('not-an-id', 10, null).runs.size());
     }
 
     @isTest

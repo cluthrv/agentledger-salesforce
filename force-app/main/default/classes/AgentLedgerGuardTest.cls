@@ -140,9 +140,8 @@ private class AgentLedgerGuardTest {
         Id sessionId = closedRun();
         AgentAuditRecorder.verifySession(sessionId);
         AgentLedgerAccess.readAccessForTest = new Map<Id, Boolean>{ Id.valueOf(CASE_ID) => true }; // the viewer can read the record
-        RecordAuditTrailController.SessionSummary summary = RecordAuditTrailController.getSessionsForRecord(CASE_ID)[0];
-        System.assertEquals('Closed', summary.lifecycle);
-        System.assert(summary.closed);
+        AgentLedgerTimelineController.RunView summary = AgentLedgerTimelineController.getTimeline(CASE_ID, 10, null).runs[0];
+        System.assertEquals('Closed', summary.status);
         System.assertEquals('Verified', summary.integrity);
         System.assertNotEquals(null, summary.lastVerifiedAt);
     }
