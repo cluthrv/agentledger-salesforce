@@ -95,7 +95,14 @@ public without sharing class AgentLedgerChangeDetector {
     }
 
     public static void handle(List<SObject> newRows, Map<Id, SObject> oldMap, System.TriggerOperation op) {
-        if (running || AgentLedgerGuard.isRecordedChange() || AgentLedgerGuard.isLedgerWrite() || !isActionRequest()) {
+        if (running || AgentLedgerGuard.isLedgerWrite()) {
+            return;
+        }
+        // During a recorded action's change, the record it writes is logged by
+        // the action; changes automation makes to other records are collected
+        // here and logged by the action in the same run.
+        Boolean collecting = AgentLedgerGuard.isRecordedChange();
+        if (!collecting && !isActionRequest()) {
             return;
         }
         List<SObject> rows = op == System.TriggerOperation.AFTER_DELETE ? oldMap.values() : newRows;
@@ -111,19 +118,78 @@ public without sharing class AgentLedgerChangeDetector {
         try {
             List<SObject> summarized = new List<SObject>();
             for (SObject row : rows) {
+                if (collecting && AgentLedgerGuard.isRecordedTarget(row.Id)) {
+                    continue;
+                }
                 if (rowsLogged < MAX_ROWS_PER_TRANSACTION) {
-                    logRow(row, oldMap == null ? null : oldMap.get(row.Id), op, d);
+                    SObject old = oldMap == null ? null : oldMap.get(row.Id);
+                    if (collecting) {
+                        collectRow(row, old, op, d);
+                    } else {
+                        logRow(row, old, op, d);
+                    }
                     rowsLogged++;
                 } else {
                     summarized.add(row);
                 }
             }
             if (!summarized.isEmpty()) {
-                logBulk(summarized, op, d);
+                if (collecting) {
+                    AgentLedgerGuard.addSideEffect(bulkEntry(summarized, op, d, AgentLedgerGuard.recordedAgentId(), true));
+                } else {
+                    logBulk(summarized, op, d);
+                }
             }
         } finally {
             running = false;
         }
+    }
+
+    public static final String AUTOMATION_REASON = 'Detected by AgentLedger: automation (a flow, trigger or process) '
+        + 'changed this record in the same transaction as the agent\'s recorded change.';
+
+    /** A change automation made to another record during a recorded action: kept for the action to log. */
+    private static void collectRow(SObject row, SObject old, System.TriggerOperation op, Schema.DescribeSObjectResult d) {
+        String agentId = AgentLedgerGuard.recordedAgentId();
+        AgentLedgerSettings.Resolved settings = AgentLedgerSettings.forAgent(agentId);
+        if (!settings.enabled) {
+            return;
+        }
+        List<AgentLedgerRecordSupport.FieldChange> changes = changes(row, old, op, d, settings);
+        if (op == System.TriggerOperation.AFTER_UPDATE && changes.isEmpty()) {
+            return;
+        }
+        AgentLedgerGuard.addSideEffect(rowEntry(row, op, d, changes, agentId, true));
+    }
+
+    /** The entry for one detected change. */
+    private static AgentAuditRecorder.EntryInput rowEntry(SObject row, System.TriggerOperation op, Schema.DescribeSObjectResult d,
+            List<AgentLedgerRecordSupport.FieldChange> changes, String agentId, Boolean byAutomation) {
+        String name = AgentLedgerRecordSupport.displayName(row, d);
+        String described = AgentLedgerRecordSupport.describeChanges(changes);
+        String how = byAutomation ? ' by automation' : ' outside AgentLedger';
+        AgentAuditRecorder.EntryInput entry = new AgentAuditRecorder.EntryInput();
+        entry.agentId = agentId;
+        entry.captureMethod = CAPTURE_METHOD;
+        entry.targetRecordId = row.Id;
+        entry.targetObject = d.getName();
+        entry.fieldChanges = changes.isEmpty() ? null : AgentLedgerRecordSupport.serializeChanges(changes);
+        entry.outputResult = String.isBlank(described) ? null : described;
+        entry.reasoning = byAutomation ? AUTOMATION_REASON
+            : 'Detected by AgentLedger: an action changed this record without an AgentLedger action, '
+                + 'so the agent did not log it or give a reason.';
+        if (op == System.TriggerOperation.AFTER_INSERT) {
+            entry.actionType = 'Create';
+            entry.summary = 'Created ' + name + how;
+        } else if (op == System.TriggerOperation.AFTER_DELETE) {
+            entry.actionType = 'Delete';
+            entry.summary = 'Deleted ' + name + how;
+        } else {
+            entry.actionType = 'Data_Change';
+            entry.summary = 'Changed ' + name + how + ': ' + described;
+        }
+        entry.summary = AgentLedgerRecordSupport.fit(entry.summary, 255);
+        return entry;
     }
 
     private static Boolean watched(AgentLedgerSettings.Resolved org, String objectName) {
@@ -159,30 +225,7 @@ public without sharing class AgentLedgerChangeDetector {
             if (runId == null) {
                 return;
             }
-
-            String name = AgentLedgerRecordSupport.displayName(row, d);
-            String described = AgentLedgerRecordSupport.describeChanges(changes);
-            AgentAuditRecorder.EntryInput entry = new AgentAuditRecorder.EntryInput();
-            entry.agentId = agentId;
-            entry.captureMethod = CAPTURE_METHOD;
-            entry.targetRecordId = row.Id;
-            entry.targetObject = d.getName();
-            entry.fieldChanges = changes.isEmpty() ? null : JSON.serialize(changes);
-            entry.outputResult = String.isBlank(described) ? null : described;
-            entry.reasoning = 'Detected by AgentLedger: an action changed this record without an AgentLedger action, '
-                + 'so the agent did not log it or give a reason.';
-            if (op == System.TriggerOperation.AFTER_INSERT) {
-                entry.actionType = 'Create';
-                entry.summary = 'Created ' + name + ' outside AgentLedger';
-            } else if (op == System.TriggerOperation.AFTER_DELETE) {
-                entry.actionType = 'Delete';
-                entry.summary = 'Deleted ' + name + ' outside AgentLedger';
-            } else {
-                entry.actionType = 'Data_Change';
-                entry.summary = 'Changed ' + name + ' outside AgentLedger: ' + described;
-            }
-            entry.summary = AgentLedgerRecordSupport.fit(entry.summary, 255);
-            AgentAuditRecorder.recordEntry(runId, entry);
+            AgentAuditRecorder.recordEntry(runId, rowEntry(row, op, d, changes, agentId, false));
         } catch (Exception e) {
             // A backstop must not break the agent, unless the org asked for
             // changes that cannot be logged to be refused.
@@ -201,25 +244,32 @@ public without sharing class AgentLedgerChangeDetector {
                 return;
             }
             Id runId = run != null ? run.Id : AgentAuditRecorder.startSession(agentId, null, 'agentforce');
-            List<String> ids = new List<String>();
-            for (SObject row : rows) {
-                ids.add(row.Id);
-            }
-            String verb = op == System.TriggerOperation.AFTER_INSERT ? 'Created'
-                : op == System.TriggerOperation.AFTER_DELETE ? 'Deleted' : 'Changed';
-            AgentAuditRecorder.EntryInput entry = new AgentAuditRecorder.EntryInput();
-            entry.agentId = agentId;
-            entry.captureMethod = CAPTURE_METHOD;
-            entry.actionType = 'Data_Change';
-            entry.targetObject = d.getName();
-            entry.summary = AgentLedgerRecordSupport.fit(verb + ' ' + rows.size() + ' more ' + d.getLabelPlural() + ' outside AgentLedger', 255);
-            entry.inputContext = AgentLedgerRecordSupport.fit(String.join(ids, ', '), 32000);
-            entry.reasoning = 'Detected by AgentLedger: a bulk change by an action; the first '
-                + MAX_ROWS_PER_TRANSACTION + ' records are logged one by one, these together.';
-            AgentAuditRecorder.recordEntry(runId, entry);
+            AgentAuditRecorder.recordEntry(runId, bulkEntry(rows, op, d, agentId, false));
         } catch (Exception e) {
             // Best effort for the summary; the individual entries were attempted above.
         }
+    }
+
+    private static AgentAuditRecorder.EntryInput bulkEntry(List<SObject> rows, System.TriggerOperation op,
+            Schema.DescribeSObjectResult d, String agentId, Boolean byAutomation) {
+        List<String> ids = new List<String>();
+        for (SObject row : rows) {
+            ids.add(row.Id);
+        }
+        String verb = op == System.TriggerOperation.AFTER_INSERT ? 'Created'
+            : op == System.TriggerOperation.AFTER_DELETE ? 'Deleted' : 'Changed';
+        AgentAuditRecorder.EntryInput entry = new AgentAuditRecorder.EntryInput();
+        entry.agentId = agentId;
+        entry.captureMethod = CAPTURE_METHOD;
+        entry.actionType = 'Data_Change';
+        entry.targetObject = d.getName();
+        entry.summary = AgentLedgerRecordSupport.fit(verb + ' ' + rows.size() + ' more ' + d.getLabelPlural()
+            + (byAutomation ? ' by automation' : ' outside AgentLedger'), 255);
+        entry.inputContext = AgentLedgerRecordSupport.fit(String.join(ids, ', '), 32000);
+        entry.reasoning = (byAutomation ? 'Detected by AgentLedger: a bulk change by automation during the agent\'s recorded change'
+            : 'Detected by AgentLedger: a bulk change by an action')
+            + '; the first ' + MAX_ROWS_PER_TRANSACTION + ' records are logged one by one, these together.';
+        return entry;
     }
 
     /**

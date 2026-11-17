@@ -64,6 +64,8 @@ public with sharing class UpdateRecordAgentLedgerAction {
         AgentLedgerSettings.Resolved settings = AgentLedgerSettings.forAgent(req.agentId);
         SObject before;
         Schema.DescribeSObjectResult d;
+        String requested;
+        List<AgentAuditRecorder.EntryInput> sideEffects = new List<AgentAuditRecorder.EntryInput>();
         try {
             if (String.isBlank(req.reasoning)) {
                 throw new AgentLedgerRecordSupport.RecordException('Reasoning is required.');
@@ -92,13 +94,15 @@ public with sharing class UpdateRecordAgentLedgerAction {
                 readFields.add(fd.getName());
             }
 
+            requested = AgentLedgerRecordSupport.loggableRequest(settings, d, values);
             before = AgentLedgerRecordSupport.readRecord(recordId, readFields);
-            AgentLedgerGuard.beginRecordedChange();
+            AgentLedgerGuard.beginRecordedChange(recordId, req.agentId);
             try {
                 Database.update(toUpdate, AccessLevel.USER_MODE);
             } finally {
                 AgentLedgerGuard.endRecordedChange();
             }
+            sideEffects = AgentLedgerGuard.takeSideEffects(recordId);
             SObject after = AgentLedgerRecordSupport.readRecord(recordId, readFields);
 
             for (Schema.DescribeFieldResult fd : fields) {
@@ -122,6 +126,7 @@ public with sharing class UpdateRecordAgentLedgerAction {
                 : AgentLedgerRecordSupport.describeChanges(changes);
             res.success = true;
         } catch (Exception e) {
+            AgentLedgerGuard.takeSideEffects(null);
             Database.rollback(sp);
             res.success = false;
             res.errorMessage = e.getMessage();
@@ -141,7 +146,7 @@ public with sharing class UpdateRecordAgentLedgerAction {
             entry.reasoning = req.reasoning;
             entry.targetRecordId = req.recordId;
             entry.targetObject = d.getName();
-            entry.inputContext = 'Requested: ' + req.fieldValues;
+            entry.inputContext = requested;
             entry.outputResult = res.changes;
             entry.fieldChanges = AgentLedgerRecordSupport.serializeChanges(changes);
             String name = AgentLedgerRecordSupport.displayName(before, d);
@@ -149,6 +154,10 @@ public with sharing class UpdateRecordAgentLedgerAction {
                 ? req.summary
                 : (changes.isEmpty() ? 'No change to ' + name : 'Updated ' + name + ': ' + res.changes), 255);
             AgentAuditRecorder.recordEntry(runId, entry);
+            for (AgentAuditRecorder.EntryInput effect : sideEffects) {
+                effect.agentId = req.agentId;
+                AgentAuditRecorder.recordEntry(runId, effect);
+            }
             res.sessionId = runId;
             res.logged = true;
         } catch (Exception logError) {

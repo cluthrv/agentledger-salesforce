@@ -145,8 +145,9 @@ and one record per agent. Custom metadata, so settings deploy between orgs.
 - **Chain:** each entry stores the previous entry's hash.
 - **Fingerprint:** when a run closes, a Merkle root (RFC 6962 style) over all
   entry hashes.
-- **Verify:** recomputes every hash, the chain and the root, and records the
-  result and its time. A run found Tampered says so until a later check finds it
+- **Verify:** recomputes every hash, the chain and the root, checks that each
+  entry's displayed time matches its hashed timestamp, and records the result
+  and its time. A run found Tampered says so until a later check finds it
   intact again.
 - **Runs from before v2** keep verifying with the original (v1) rules, in the
   time zone of the user who recorded them.
@@ -160,7 +161,8 @@ and one record per agent. Custom metadata, so settings deploy between orgs.
   ```
 
   Both need version 0.3.0 or later. Whoever can see a run can export it. Values of fields the
-  exporting user cannot read are left out; those entries are listed in the file
+  exporting user cannot read are left out, and so is all content of steps on
+  records they cannot read; those entries are listed in the file
   (`salesforce.hiddenFields`) and do not verify. Runs from before v2 cannot be
   exported. `node scripts/check-export.mjs <org> [run names]` exports runs from
   an org and verifies them with the published npm library.
@@ -172,8 +174,17 @@ and one record per agent. Custom metadata, so settings deploy between orgs.
 ## Access
 
 Runs are private. Whoever can read a record can see and verify what agents did
-to it (Salesforce's own record access decides). A field change is shown only if
-the viewer can read that field.
+to it (Salesforce's own record access decides). A run can touch several
+records: a step on a record the viewer cannot read is shown only as "A step on
+a record you do not have access to", with none of its content, and is left out
+of exports and Check history. A field change is shown only if the viewer can
+read that field.
+
+**Privacy settings** apply everywhere a value could appear: with **Store field
+values** off, or a field in **Fields never stored**, its values are kept out of
+the field changes, the result and the logged request. The agent's own
+reasoning is free text and is stored as written, so instructions should not
+ask the agent to repeat sensitive values in it.
 
 | Permission set | For |
 | --- | --- |
@@ -206,6 +217,14 @@ through the UI or API, and a Flow called through the Actions API, are neither. A
 they are not logged twice. Bulk changes log the first 20 records one by one and
 the rest in one entry.
 
+**Automation during a recorded change.** When Update or Create Record
+(AgentLedger) changes a record and a flow, trigger or process then changes
+*other* watched records in the same transaction, those changes are logged in
+the same run, right after the agent's change, as "Changed … by automation".
+Changes to the same record appear in the agent's own entry, marked as set
+automatically. Asynchronous automation (scheduled paths, queueable jobs,
+platform events) runs in a later transaction and is not attributed to the run.
+
 For another object, add a trigger:
 
 ```apex
@@ -219,8 +238,10 @@ empty means every object with a detector trigger.
 
 **Check history.** The **Check history** button on a run compares it with
 Salesforce's own Field History: the tracked field changes made by the run's user
-on the records it touched, while it ran. Each is looked up in the log; any the
-log does not have are listed. This does not rely on AgentLedger's capture. It
+on the records it touched, while it ran. Each is matched, oldest first, to a
+logged change of its own for the same record and field, so a field changed
+twice needs two logged changes; any the log does not have are listed. Records
+the viewer cannot read are not checked, and the result says how many. This does not rely on AgentLedger's capture. It
 covers fields with Field History Tracking turned on; objects without field
 history are named. A person's own edit during the run is listed too, for the
 reviewer to judge.
@@ -279,3 +300,4 @@ runs a subset.
 | AgentLedgerRecordedActionsTest | Recorded actions, automatic runs, auto-close |
 | AgentLedgerPolicyTest | Agent version, instructions and policy capture; access |
 | AgentLedgerUiTest | Timeline, Agent Activity and Setup pages |
+| AgentLedgerReviewFixesTest | Steps on records the viewer cannot read, privacy in the logged request, automation on other records, displayed time, one-to-one Check history |

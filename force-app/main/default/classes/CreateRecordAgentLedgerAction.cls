@@ -60,6 +60,8 @@ public with sharing class CreateRecordAgentLedgerAction {
         Schema.DescribeSObjectResult d;
         SObject created;
         List<AgentLedgerRecordSupport.FieldChange> written = new List<AgentLedgerRecordSupport.FieldChange>();
+        String requested;
+        List<AgentAuditRecorder.EntryInput> sideEffects = new List<AgentAuditRecorder.EntryInput>();
         try {
             if (String.isBlank(req.reasoning)) {
                 throw new AgentLedgerRecordSupport.RecordException('Reasoning is required.');
@@ -77,12 +79,14 @@ public with sharing class CreateRecordAgentLedgerAction {
                 record.put(fd.getName(), AgentLedgerRecordSupport.coerce(fd, values.get(key)));
                 fields.add(fd);
             }
-            AgentLedgerGuard.beginRecordedChange();
+            requested = AgentLedgerRecordSupport.loggableRequest(settings, d, values);
+            AgentLedgerGuard.beginRecordedChange(null, req.agentId);
             try {
                 Database.insert(record, AccessLevel.USER_MODE);
             } finally {
                 AgentLedgerGuard.endRecordedChange();
             }
+            sideEffects = AgentLedgerGuard.takeSideEffects(record.Id);
             Set<String> readFields = new Set<String>();
             for (Schema.DescribeFieldResult fd : fields) {
                 readFields.add(fd.getName());
@@ -98,6 +102,7 @@ public with sharing class CreateRecordAgentLedgerAction {
             res.recordId = record.Id;
             res.success = true;
         } catch (Exception e) {
+            AgentLedgerGuard.takeSideEffects(null);
             Database.rollback(sp);
             res.success = false;
             res.errorMessage = e.getMessage();
@@ -117,13 +122,17 @@ public with sharing class CreateRecordAgentLedgerAction {
             entry.reasoning = req.reasoning;
             entry.targetRecordId = res.recordId;
             entry.targetObject = d.getName();
-            entry.inputContext = 'Requested: ' + req.fieldValues;
+            entry.inputContext = requested;
             entry.outputResult = AgentLedgerRecordSupport.describeChanges(written);
-            entry.fieldChanges = System.JSON.serialize(written);
+            entry.fieldChanges = AgentLedgerRecordSupport.serializeChanges(written);
             entry.summary = AgentLedgerRecordSupport.fit(String.isNotBlank(req.summary)
                 ? req.summary
                 : 'Created ' + AgentLedgerRecordSupport.displayName(created, d), 255);
             AgentAuditRecorder.recordEntry(runId, entry);
+            for (AgentAuditRecorder.EntryInput effect : sideEffects) {
+                effect.agentId = req.agentId;
+                AgentAuditRecorder.recordEntry(runId, effect);
+            }
             res.sessionId = runId;
             res.logged = true;
         } catch (Exception logError) {

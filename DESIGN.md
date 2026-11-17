@@ -258,7 +258,7 @@ that the Python verifier rejected action types outside its enum ("Query",
 
 `hardening/` installs the package in a clean org and exercises it as an admin,
 a viewer and an agent user (87 checks, passing on every version from 0.1.0-4
-to 0.1.0-8; the first run upgraded from 0.1.0-3). Findings:
+to 0.1.0-9; the first run upgraded from 0.1.0-3). Findings:
 
 - **An upgrade reset the org's settings.** The package shipped the
   `Org_Default` custom metadata record, and installing a new version
@@ -307,6 +307,37 @@ to 0.1.0-8; the first run upgraded from 0.1.0-3). Findings:
   - The log also showed the agent contradicting itself (a timeline check
     reported as failed, then "all three criteria passed"), which is the kind
     of inconsistency the log exists to surface.
+
+### 6.7 Repository review fixes (0.1.0-9, November 2026)
+
+An external review of the public repository found, and the code confirmed:
+
+- **Steps on other records.** A run can touch several records, and the record
+  page and Export checked access only to the record being viewed (or the run's
+  related record). Now each step is checked against the record it is about
+  (its target, else the run's record), in one batched UserRecordAccess query.
+  A step on a record the viewer cannot read shows only that it happened; Export
+  replaces its content and lists it under `salesforce.hiddenFields`; Check
+  history leaves such records out and says how many.
+- **"Never store" values in the request text.** Update and Create Record
+  logged the agent's request verbatim. The request is now rebuilt from the
+  parsed values with the privacy settings applied. The agent's free-text
+  reasoning is stored as written; that is documented.
+- **Automation changing other records during a recorded change** was
+  suppressed with the action's own change. The guard now records which record
+  the action writes; the detector collects changes to other watched records as
+  side effects, and the action logs them in the same run and transaction, so
+  the "If Logging Fails" rule covers them too. Asynchronous automation is out
+  of scope and documented as such.
+- **Displayed time and hashed time.** The hash covers the timestamp text; the
+  time users see is a separate field. Verify now checks they agree (to the
+  second, since date/time fields keep whole seconds).
+- **Check history** counted a field as covered if the log had it once. Each
+  Field History row now needs a logged change of its own, matched oldest first.
+
+Not changed: standalone Merkle proofs are verified against the root carried in
+the proof; nothing in the package uses proofs yet, and a verifier must supply
+the trusted root itself when they are exposed.
 
 ## 7. Anchoring
 
@@ -380,7 +411,7 @@ will offer to pause and resume auto-close around upgrades.
   listing later.
 - Action registrations: inside the package (Spike S2 confirmed unlocked
   packages can carry `GenAiFunction`), built in an Agentforce-shaped build org.
-  Beta versions are built with code coverage (latest 0.1.0-8); promoting a
+  Beta versions are built with code coverage (latest 0.1.0-9); promoting a
   released version, which production orgs need, is the next packaging step.
   Installing from source with `scripts/deploy.mjs` remains for development.
 - First open of the AgentLedger app shows the setup checklist.

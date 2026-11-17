@@ -20,7 +20,7 @@ Open source (MIT), native to Salesforce, no external services.
 | | |
 | --- | --- |
 | **Activity timeline** | A component for any record page: each agent run, its steps in plain language, field changes with before and after values, and whether each step was recorded automatically or reported by the agent. |
-| **Recorded actions** | Get, Update and Create Record (AgentLedger): drop-in replacements for the standard record actions. The change and its log entry are written together, so the agent cannot change data without it being logged. Fields the change sets as a knock-on effect (a stage's default Probability, a flow or trigger) are logged too, marked as set automatically. |
+| **Recorded actions** | Get, Update and Create Record (AgentLedger): drop-in replacements for the standard record actions. The change and its log entry are written together, so a change made through them is always logged. Fields the change sets as a knock-on effect (a stage's default Probability, a flow or trigger) are logged too, marked as set automatically, and so are changes that automation makes to other watched records in the same transaction. |
 | **What the agent acted under** | Every run records the agent version, a fingerprint of its instructions (the full text is kept once per version) and the policy it acted under. For agents built in the new Agentforce Builder, the captured instructions are the agent-level instructions and subagent descriptions; subagent reasoning instructions are read in that agent version in Builder. |
 | **Modes** | Activity Log (default), Tamper-Evident, or Tamper-Evident + Anchored, set for the org and per agent. |
 | **Change detector** | Triggers on Account, Contact, Lead, Opportunity and Case log changes an agent makes without an AgentLedger action, such as through the standard Update Record action. They are marked "Detected: not logged by the agent". |
@@ -71,12 +71,12 @@ job.
 
 Requires Agentforce in the org.
 
-**Package.** Install the latest version, 0.1.0-8, from this link (for a
+**Package.** Install the latest version, 0.1.0-9, from this link (for a
 sandbox, use `test.salesforce.com` instead of `login.salesforce.com`), and choose
 **Install for Admins Only**:
 
 ```text
-https://login.salesforce.com/packaging/installPackage.apexp?p0=04tgK000000a3yfQAA
+https://login.salesforce.com/packaging/installPackage.apexp?p0=04tgK000000agrxQAA
 ```
 
 This is a beta version: Salesforce installs it in sandboxes, scratch orgs and

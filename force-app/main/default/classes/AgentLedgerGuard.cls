@@ -65,6 +65,24 @@ public with sharing class AgentLedgerGuard {
      * finally block.
      */
     public static void beginRecordedChange() {
+        beginRecordedChange(null, null);
+    }
+
+    /**
+     * As above, naming the record the action writes (null for a create, whose
+     * Id is not known yet) and the agent. Changes that automation makes to
+     * other records during the change are collected as side effects, for the
+     * action to log in the same run.
+     */
+    public static void beginRecordedChange(Id targetId, String agentId) {
+        if (recordedChangeDepth == 0) {
+            recordedTargets.clear();
+            sideEffects.clear();
+            recordedAgentId = agentId;
+        }
+        if (targetId != null) {
+            recordedTargets.add(targetId);
+        }
         recordedChangeDepth++;
     }
 
@@ -74,6 +92,39 @@ public with sharing class AgentLedgerGuard {
 
     public static Boolean isRecordedChange() {
         return recordedChangeDepth > 0;
+    }
+
+    private static Set<Id> recordedTargets = new Set<Id>();
+    private static String recordedAgentId;
+    private static List<AgentAuditRecorder.EntryInput> sideEffects = new List<AgentAuditRecorder.EntryInput>();
+
+    /** Whether a record is the one the recorded action itself writes. */
+    public static Boolean isRecordedTarget(Id recordId) {
+        return recordId != null && recordedTargets.contains(recordId);
+    }
+
+    /** The agent whose recorded change is running. */
+    public static String recordedAgentId() {
+        return recordedAgentId;
+    }
+
+    /** A change automation made to another record during the recorded change. */
+    public static void addSideEffect(AgentAuditRecorder.EntryInput entry) {
+        sideEffects.add(entry);
+    }
+
+    /** The side effects collected since the recorded change began, without the given record's. */
+    public static List<AgentAuditRecorder.EntryInput> takeSideEffects(Id excludeTargetId) {
+        List<AgentAuditRecorder.EntryInput> out = new List<AgentAuditRecorder.EntryInput>();
+        String excluded = excludeTargetId == null ? null : String.valueOf(excludeTargetId);
+        for (AgentAuditRecorder.EntryInput e : sideEffects) {
+            if (excluded == null || e.targetRecordId == null
+                    || (e.targetRecordId != excluded && e.targetRecordId != excluded.left(15))) {
+                out.add(e);
+            }
+        }
+        sideEffects.clear();
+        return out;
     }
 
     /** True when the running user may edit entries for testing. */

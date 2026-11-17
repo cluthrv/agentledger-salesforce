@@ -154,16 +154,33 @@ public without sharing class AgentLedgerTimelineController {
             timeline.runs.add(v);
         }
 
-        for (Agent_Audit_Record__c e : [
+        Map<Id, String> relatedByRun = new Map<Id, String>();
+        for (Agent_Audit_Session__c r : runs) {
+            relatedByRun.put(r.Id, r.Related_Record_Id__c);
+        }
+        List<Agent_Audit_Record__c> entries = [
             SELECT Id, Audit_Session__c, Sequence_Number__c, Action_Type__c, Summary__c, Reasoning__c,
                    Input_Context__c, Output_Result__c, Capture_Method__c, Target_Record_Id__c, Target_Object__c,
                    Action_Timestamp__c, Timestamp_Text__c, Policy_Reference__c, Field_Changes__c, Record_Hash__c
             FROM Agent_Audit_Record__c
             WHERE Audit_Session__c IN :views.keySet()
             ORDER BY Audit_Session__c, Sequence_Number__c ASC
-        ]) {
+        ];
+        // A run can touch several records. Steps on a record the viewer cannot
+        // read are shown only as such, with none of their content.
+        Set<String> otherRecords = new Set<String>();
+        for (Agent_Audit_Record__c e : entries) {
+            String rec = AgentLedgerAccess.entryRecord(e.Target_Record_Id__c, relatedByRun.get(e.Audit_Session__c));
+            if (rec != null && !idForms.contains(rec)) {
+                otherRecords.add(rec);
+            }
+        }
+        Set<String> readable = AgentLedgerAccess.readableRecords(otherRecords);
+        for (Agent_Audit_Record__c e : entries) {
             RunView run = views.get(e.Audit_Session__c);
-            run.entries.add(toEntryView(e, idForms, run.tamperEvident));
+            String rec = AgentLedgerAccess.entryRecord(e.Target_Record_Id__c, relatedByRun.get(e.Audit_Session__c));
+            Boolean restricted = rec != null && !idForms.contains(rec) && !readable.contains(rec);
+            run.entries.add(restricted ? restrictedEntryView(e) : toEntryView(e, idForms, run.tamperEvident));
         }
         return timeline;
     }
@@ -213,6 +230,23 @@ public without sharing class AgentLedgerTimelineController {
         'Data_Change' => 'Data change', 'Tool_Call' => 'Tool call', 'Human_Response' => 'Human response',
         'Query' => 'Lookup'
     };
+
+    public static final String RESTRICTED_SUMMARY = 'A step on a record you do not have access to';
+
+    /** A step on a record the viewer cannot read: that it happened, and nothing of its content. */
+    private static EntryView restrictedEntryView(Agent_Audit_Record__c e) {
+        EntryView v = new EntryView();
+        v.entryId = e.Id;
+        v.sequence = e.Sequence_Number__c == null ? null : e.Sequence_Number__c.intValue();
+        v.type = e.Action_Type__c;
+        v.typeLabel = TYPE_LABELS.containsKey(e.Action_Type__c) ? TYPE_LABELS.get(e.Action_Type__c) : e.Action_Type__c;
+        v.summary = RESTRICTED_SUMMARY;
+        v.captureLabel = 'Restricted';
+        v.capturedByCode = false;
+        v.targetsThisRecord = false;
+        v.timestamp = e.Action_Timestamp__c;
+        return v;
+    }
 
     private static EntryView toEntryView(Agent_Audit_Record__c e, Set<String> idForms, Boolean tamperEvident) {
         EntryView v = new EntryView();

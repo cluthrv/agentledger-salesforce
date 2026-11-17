@@ -36,7 +36,18 @@ public without sharing class AgentLedgerReconciliation {
     }
 
     /** One Field History row, whatever the history object. */
-    public class HistoryRow {
+    public class HistoryRow implements Comparable {
+        /** Oldest first, so the log's changes are matched in order. */
+        public Integer compareTo(Object other) {
+            DateTime o = ((HistoryRow) other).createdDate;
+            if (createdDate == o) {
+                return 0;
+            }
+            if (createdDate == null) {
+                return -1;
+            }
+            return o == null || createdDate > o ? 1 : -1;
+        }
         public String recordId;
         public String field;
         public Object oldValue;
@@ -81,7 +92,9 @@ public without sharing class AgentLedgerReconciliation {
         if (String.isNotBlank(run.Related_Record_Id__c) && String.isNotBlank(run.Related_Object__c)) {
             objectOf.put(norm(run.Related_Record_Id__c), run.Related_Object__c);
         }
-        Set<String> logged = new Set<String>();
+        // How many times the log has each record and field changed: each
+        // Field History row must be matched by a change of its own.
+        Map<String, Integer> logged = new Map<String, Integer>();
         for (Agent_Audit_Record__c e : [
             SELECT Target_Record_Id__c, Target_Object__c, Field_Changes__c
             FROM Agent_Audit_Record__c WHERE Audit_Session__c = :runId
@@ -98,11 +111,22 @@ public without sharing class AgentLedgerReconciliation {
                 for (Object o : (List<Object>) JSON.deserializeUntyped(e.Field_Changes__c)) {
                     String f = (String) ((Map<String, Object>) o).get('field');
                     if (f != null) {
-                        logged.add(rec + '|' + f.toLowerCase());
+                        String key = rec + '|' + f.toLowerCase();
+                        logged.put(key, (logged.containsKey(key) ? logged.get(key) : 0) + 1);
                     }
                 }
             } catch (Exception ex) {
                 // Not a list of changes: nothing to match against.
+            }
+        }
+
+        // Only records the user can read are checked.
+        Set<String> readableRecs = AgentLedgerAccess.readableRecords(objectOf.keySet());
+        Integer restricted = 0;
+        for (String rec : new List<String>(objectOf.keySet())) {
+            if (!readableRecs.contains(rec)) {
+                objectOf.remove(rec);
+                restricted++;
             }
         }
 
@@ -129,6 +153,7 @@ public without sharing class AgentLedgerReconciliation {
                 continue;
             }
             Map<String, Schema.SObjectField> fields = type == null ? null : type.getDescribe().fields.getMap();
+            rows.sort();
             for (HistoryRow h : rows) {
                 if (h.field == null || h.field.equalsIgnoreCase('created')) {
                     continue;
@@ -139,7 +164,9 @@ public without sharing class AgentLedgerReconciliation {
                     continue;
                 }
                 result.historyChanges++;
-                if (logged.contains(key)) {
+                Integer remaining = logged.get(key);
+                if (remaining != null && remaining > 0) {
+                    logged.put(key, remaining - 1);
                     result.matched++;
                     continue;
                 }
@@ -165,6 +192,9 @@ public without sharing class AgentLedgerReconciliation {
                     + ' field change(s) Salesforce recorded during this run are not in the log.';
         if (!result.notTracked.isEmpty()) {
             result.summary += ' No field history for: ' + String.join(result.notTracked, ', ') + '.';
+        }
+        if (restricted > 0) {
+            result.summary += ' ' + restricted + ' record(s) the run touched were not checked because you do not have access to them.';
         }
         return result;
     }

@@ -67,10 +67,24 @@ public without sharing class AgentLedgerEvidence {
             ORDER BY Sequence_Number__c ASC
         ];
 
+        // A run can touch several records: the content of steps on records the
+        // exporting user cannot read is not exported.
+        Set<String> entryRecords = new Set<String>();
+        for (Agent_Audit_Record__c e : entries) {
+            String rec = AgentLedgerAccess.entryRecord(e.Target_Record_Id__c, run.Related_Record_Id__c);
+            if (rec != null) {
+                entryRecords.add(rec);
+            }
+        }
+        Set<String> readable = AgentLedgerAccess.readableRecords(entryRecords);
+
         List<Object> records = new List<Object>();
         List<Object> hidden = new List<Object>();
         for (Agent_Audit_Record__c e : entries) {
-            List<String> hiddenFields = hideUnreadableFields(e);
+            String rec = AgentLedgerAccess.entryRecord(e.Target_Record_Id__c, run.Related_Record_Id__c);
+            List<String> hiddenFields = rec != null && !readable.contains(rec)
+                ? hideRestrictedEntry(e)
+                : hideUnreadableFields(e);
             Map<String, Object> record = HashChainService.entryContentV2(e, run.Session_Id__c);
             record.put('hash', e.Record_Hash__c);
             records.add(record);
@@ -128,6 +142,18 @@ public without sharing class AgentLedgerEvidence {
         result.fileName = 'agentledger-' + run.Name + '.json';
         result.hiddenEntries = hidden.size();
         return result;
+    }
+
+    /** Replaces all content of an entry on a record the user cannot read. Works on the queried copy only. */
+    @TestVisible
+    private static List<String> hideRestrictedEntry(Agent_Audit_Record__c e) {
+        e.Summary__c = HIDDEN;
+        e.Reasoning__c = HIDDEN;
+        e.Input_Context__c = HIDDEN;
+        e.Output_Result__c = HIDDEN;
+        e.Field_Changes__c = String.isBlank(e.Field_Changes__c) ? null : HIDDEN;
+        e.Target_Record_Id__c = HIDDEN;
+        return new List<String>{ '(record not accessible)' };
     }
 
     /**

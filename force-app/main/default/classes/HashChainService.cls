@@ -200,6 +200,14 @@ public with sharing class HashChainService {
                     '): hash verification failed — content may have been tampered with');
             }
 
+            // The hash covers the timestamp text; the time shown to users is a
+            // separate field, so it must agree with the hashed text.
+            if (hashVersion == HASH_V2 && !timestampsAgree(record)) {
+                result.valid = false;
+                result.errors.add('Record ' + i + ' (' + record.Name +
+                    '): the displayed time does not match the recorded time');
+            }
+
             if (i > 0 && record.Previous_Hash__c != records[i - 1].Record_Hash__c) {
                 result.valid = false;
                 result.errors.add('Record ' + i + ' (' + record.Name +
@@ -208,6 +216,16 @@ public with sharing class HashChainService {
         }
 
         return result;
+    }
+
+    /** Whether an entry's displayed time is the hashed timestamp text. Entries without both are not checked. */
+    @TestVisible
+    private static Boolean timestampsAgree(Agent_Audit_Record__c record) {
+        if (record.Action_Timestamp__c == null || String.isBlank(record.Timestamp_Text__c)) {
+            return true;
+        }
+        // Date/time fields keep whole seconds; the hashed text also has milliseconds.
+        return record.Action_Timestamp__c.formatGmt('yyyy-MM-dd\'T\'HH:mm:ss') == record.Timestamp_Text__c.left(19);
     }
 
     /** v1 chain check, kept for compatibility. */

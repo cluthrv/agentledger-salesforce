@@ -53,6 +53,22 @@ public with sharing class AgentLedgerRecordSupport {
         return out;
     }
 
+    /**
+     * The agent's request as logged: its field values with the privacy
+     * settings applied, so a "never store" value is not kept in the request
+     * text either.
+     */
+    public static String loggableRequest(AgentLedgerSettings.Resolved settings, Schema.DescribeSObjectResult d, Map<String, Object> values) {
+        Map<String, Schema.SObjectField> fields = d.fields.getMap();
+        Map<String, Object> out = new Map<String, Object>();
+        for (String key : values.keySet()) {
+            Schema.SObjectField f = fields.get(key.trim().toLowerCase());
+            String name = f == null ? key.trim() : f.getDescribe().getName();
+            out.put(name, mayStoreValue(settings, d.getName(), name) ? values.get(key) : NOT_STORED);
+        }
+        return 'Requested: ' + System.JSON.serialize(out);
+    }
+
     /** The changes as stored in Field_Changes__c; "automatic" appears only on knock-on changes. */
     public static String serializeChanges(List<FieldChange> changes) {
         List<Object> out = new List<Object>();

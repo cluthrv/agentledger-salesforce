@@ -31,6 +31,58 @@ public without sharing class AgentLedgerAccess {
         return !access.isEmpty() && access[0].HasReadAccess;
     }
 
+    /**
+     * Of the given record Ids (15 or 18 characters), those the running user
+     * can read. Ids that are not record Ids are left out.
+     */
+    public static Set<String> readableRecords(Set<String> recordIds) {
+        Set<String> readable = new Set<String>();
+        Map<Id, Set<String>> formsById = new Map<Id, Set<String>>();
+        for (String s : recordIds) {
+            if (String.isBlank(s)) {
+                continue;
+            }
+            Id recordId;
+            try {
+                recordId = Id.valueOf(s);
+            } catch (Exception e) {
+                continue;
+            }
+            if (readAccessForTest != null && readAccessForTest.containsKey(recordId)) {
+                if (readAccessForTest.get(recordId)) {
+                    readable.add(s);
+                }
+                continue;
+            }
+            if (!formsById.containsKey(recordId)) {
+                formsById.put(recordId, new Set<String>());
+            }
+            formsById.get(recordId).add(s);
+        }
+        List<Id> pending = new List<Id>(formsById.keySet());
+        Integer i = 0;
+        while (i < pending.size()) {
+            List<Id> chunk = new List<Id>();
+            while (i < pending.size() && chunk.size() < 200) {
+                chunk.add(pending[i++]);
+            }
+            for (UserRecordAccess a : [
+                SELECT RecordId, HasReadAccess FROM UserRecordAccess
+                WHERE UserId = :UserInfo.getUserId() AND RecordId IN :chunk
+            ]) {
+                if (a.HasReadAccess) {
+                    readable.addAll(formsById.get(a.RecordId));
+                }
+            }
+        }
+        return readable;
+    }
+
+    /** The record an entry is about: its target, or else its run's related record. */
+    public static String entryRecord(String targetRecordId, String runRelatedRecordId) {
+        return String.isNotBlank(targetRecordId) ? targetRecordId : runRelatedRecordId;
+    }
+
     /** Answers to use instead of field-level security, for tests: field name (lower case) to readable. */
     @TestVisible
     private static Map<String, Boolean> fieldReadableForTest;
